@@ -1,0 +1,47 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>習慣情報ビューア</title>
+  <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+  <style>
+    body { font-family: sans-serif; padding: 1rem; }
+    .entry { margin-bottom: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; }
+    .entry h3 { margin: 0 0 0.5rem; }
+    .entry a { text-decoration: none; color: blue; }
+  </style>
+</head>
+<body>
+  <h1>習慣テーマ記事</h1>
+  <div id="entries"></div>
+
+  <script>
+    const SHEET_URL = 'YOUR_CSV_URL_HERE'; // ←さきほどのCSV公開URLを入れてください
+
+    fetch(SHEET_URL)
+      .then(res => res.text())
+      .then(text => {
+        const rows = text.split('\n').slice(1); // 1行目はヘッダー
+        const container = document.getElementById('entries');
+        rows.forEach(row => {
+          const [title, link, date, summary, label] = row.split(',');
+          const div = document.createElement('div');
+          div.className = 'entry';
+          div.innerHTML = `
+            <h3><a href="${link}" target="_blank">${title}</a></h3>
+            <p>${summary}</p>
+            <small>${label} / ${date}</small>
+          `;
+          container.appendChild(div);
+        });
+      });
+  </script>
+</body>
+</html>
