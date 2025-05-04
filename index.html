@@ -24,33 +24,33 @@
       .then(res => res.text())
       .then(csvText => {
         const parsed = Papa.parse(csvText, { header: true }).data;
-
         const grouped = {};
         parsed.forEach(row => {
-          const label = row.label || "その他";
+          const label = row.分類 || "その他";
           if (!grouped[label]) grouped[label] = [];
           grouped[label].push(row);
         });
-
+        
         const container = document.getElementById('entries');
         for (const label in grouped) {
           const header = document.createElement('h2');
           header.textContent = `${label} に対応する記事`;
           container.appendChild(header);
-
+        
           grouped[label].forEach(row => {
-            if (row.title && row.link) {
+            if (row.タイトル && row.URL) {
               const div = document.createElement('div');
               div.className = 'entry';
               div.innerHTML = `
-                <h3><a href="${row.link}" target="_blank">${row.title}</a></h3>
-                <p>${row.summary}</p>
-                <small>${row.label} / ${row.date}</small>
+                <h3><a href="${row.URL}" target="_blank">${row.タイトル}</a></h3>
+                <p>${row.要約}</p>
+                <small>${row.分類} / ${row.日付}</small>
               `;
               container.appendChild(div);
             }
           });
         }
+
       });
   </script>
 </body>
