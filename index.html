@@ -14,44 +14,44 @@
   </style>
 </head>
 <body>
-  <h1>情報収集</h1>
+  <h1>習慣テーマ記事</h1>
   <div id="entries"></div>
 
   <script>
-  const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrfrt1wqBo64SQRLrudsTm2PBXWzm6VmOlVcJEjrR_k2xtgDv0EOsodY64B0W-cAR8RIssKkscOM1v/pub?gid=0&single=true&output=csv';
+    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrfrt1wqBo64SQRLrudsTm2PBXWzm6VmOlVcJEjrR_k2xtgDv0EOsodY64B0W-cAR8RIssKkscOM1v/pub?gid=0&single=true&output=csv';
 
-  fetch(SHEET_URL)
-    .then(res => res.text())
-    .then(csvText => {
-      const parsed = Papa.parse(csvText, { header: true }).data;
+    fetch(SHEET_URL)
+      .then(res => res.text())
+      .then(csvText => {
+        const parsed = Papa.parse(csvText, { header: true }).data;
 
-      const grouped = {};
-      parsed.forEach(row => {
-        const label = row.label || "その他";
-        if (!grouped[label]) grouped[label] = [];
-        grouped[label].push(row);
-      });
-
-      const container = document.getElementById('entries');
-      for (const label in grouped) {
-        const header = document.createElement('h2');
-        header.textContent = `${label} に対応する記事`;
-        container.appendChild(header);
-
-        grouped[label].forEach(row => {
-          if (row.title && row.link) {
-            const div = document.createElement('div');
-            div.className = 'entry';
-            div.innerHTML = `
-              <h3><a href="${row.link}" target="_blank">${row.title}</a></h3>
-              <p>${row.summary}</p>
-              <small>${row.label} / ${row.date}</small>
-            `;
-            container.appendChild(div);
-          }
+        const grouped = {};
+        parsed.forEach(row => {
+          const label = row.label || "その他";
+          if (!grouped[label]) grouped[label] = [];
+          grouped[label].push(row);
         });
-      }
-    });
-</script>
+
+        const container = document.getElementById('entries');
+        for (const label in grouped) {
+          const header = document.createElement('h2');
+          header.textContent = `${label} に対応する記事`;
+          container.appendChild(header);
+
+          grouped[label].forEach(row => {
+            if (row.title && row.link) {
+              const div = document.createElement('div');
+              div.className = 'entry';
+              div.innerHTML = `
+                <h3><a href="${row.link}" target="_blank">${row.title}</a></h3>
+                <p>${row.summary}</p>
+                <small>${row.label} / ${row.date}</small>
+              `;
+              container.appendChild(div);
+            }
+          });
+        }
+      });
+  </script>
 </body>
 </html>
