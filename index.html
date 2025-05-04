@@ -7,10 +7,40 @@
   <link rel="manifest" href="manifest.json">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 1rem; }
-    .entry { margin-bottom: 1rem; padding: 1rem; border: 1px solid #ccc; border-radius: 8px; }
-    .entry h3 { margin: 0 0 0.5rem; }
-    .entry a { text-decoration: none; color: blue; }
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+    }
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      margin-top: 2rem;
+      font-size: 1.5rem;
+      color: #333;
+    }
+    .entry {
+      margin-bottom: 1rem;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    .entry h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+    }
+    .entry a {
+      text-decoration: none;
+      color: blue;
+    }
+    .entry p {
+      margin: 0.5rem 0;
+    }
+    .entry small {
+      color: #666;
+    }
   </style>
 </head>
 <body>
@@ -25,32 +55,32 @@
       .then(csvText => {
         const parsed = Papa.parse(csvText, { header: true }).data;
         const grouped = {};
+
         parsed.forEach(row => {
-          const label = row.分類 || "その他";
+          const label = row["分類"]?.trim() || "その他";
           if (!grouped[label]) grouped[label] = [];
           grouped[label].push(row);
         });
-        
+
         const container = document.getElementById('entries');
         for (const label in grouped) {
           const header = document.createElement('h2');
           header.textContent = `${label} に対応する記事`;
           container.appendChild(header);
-        
+
           grouped[label].forEach(row => {
-            if (row.タイトル && row.URL) {
+            if (row["タイトル"] && row["URL"]) {
               const div = document.createElement('div');
               div.className = 'entry';
               div.innerHTML = `
-                <h3><a href="${row.URL}" target="_blank">${row.タイトル}</a></h3>
-                <p>${row.要約}</p>
-                <small>${row.分類} / ${row.日付}</small>
+                <h3><a href="${row["URL"]}" target="_blank">${row["タイトル"]}</a></h3>
+                <p>${row["要約"]}</p>
+                <small>${row["分類"]} / ${row["日付"]}</small>
               `;
               container.appendChild(div);
             }
           });
         }
-
       });
   </script>
 </body>
