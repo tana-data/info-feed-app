@@ -60,13 +60,11 @@
     const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRrfrt1wqBo64SQRLrudsTm2PBXWzm6VmOlVcJEjrR_k2xtgDv0EOsodY64B0W-cAR8RIssKkscOM1v/pub?gid=0&single=true&output=csv';
     const READ_KEY = 'readArticles';
 
-    // 読み済み記事のIDを取得
     function getReadArticles() {
       const data = localStorage.getItem(READ_KEY);
       return data ? JSON.parse(data) : [];
     }
 
-    // IDを保存
     function markAsRead(id) {
       const read = getReadArticles();
       if (!read.includes(id)) {
@@ -83,8 +81,8 @@
         const readIds = getReadArticles();
 
         parsed.forEach(row => {
-          const id = row["URL"]; // IDとしてURLを使う
-          if (readIds.includes(id)) return; // 既読はスキップ
+          const id = row["URL"];
+          if (!id || readIds.includes(id)) return;
 
           const label = row["分類"]?.trim() || "その他";
           if (!grouped[label]) grouped[label] = [];
@@ -98,26 +96,33 @@
           container.appendChild(header);
 
           grouped[label].forEach(row => {
-            if (row["タイトル"] && row["URL"]) {
-              const div = document.createElement('div');
-              div.className = 'entry';
-              const id = row["URL"];
+            const div = document.createElement('div');
+            div.className = 'entry';
 
-              div.innerHTML = `
-                <h3><a href="${row["URL"]}" target="_blank">${row["タイトル"]}</a></h3>
-                <p>${row["要約"]}</p>
-                <small>${row["分類"]} / ${row["日付"]}</small><br>
-                <button class="read-button" data-id="${id}">✓ 既読にする</button>
-              `;
+            const title = row["タイトル"];
+            const url = row["URL"];
+            const summary = row["要約"];
+            const date = row["日付"];
+            const category = row["分類"];
 
-              // ボタンクリックで既読処理
-              div.querySelector('.read-button').addEventListener('click', () => {
-                markAsRead(id);
-                div.remove(); // 即座に非表示
-              });
+            const id = url;
 
-              container.appendChild(div);
-            }
+            div.innerHTML = `
+              <h3><a href="${url}" target="_blank">${title}</a></h3>
+              <p>${summary}</p>
+              <small>${category} / ${date}</small><br>
+            `;
+
+            const button = document.createElement('button');
+            button.className = 'read-button';
+            button.textContent = '✓ 既読にする';
+            button.onclick = () => {
+              markAsRead(id);
+              div.remove(); // UIから削除
+            };
+
+            div.appendChild(button);
+            container.appendChild(div);
           });
         }
       });
