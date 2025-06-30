@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RSS Feed情報収集ツール</title>
+  <link rel="manifest" href="info-feed-app/manifest.json">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 1rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #333;
+    }
+    
+    .tabs {
+      display: flex;
+      margin-bottom: 2rem;
+      border-bottom: 2px solid #ddd;
+    }
+    
+    .tab {
+      padding: 0.5rem 1rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      border-bottom: 2px solid transparent;
+    }
+    
+    .tab.active {
+      border-bottom-color: #007cba;
+      color: #007cba;
+      font-weight: bold;
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Feed管理 */
+    .feed-form {
+      margin-bottom: 2rem;
+      padding: 1rem;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    
+    .feed-form input {
+      width: 70%;
+      padding: 0.5rem;
+      margin-right: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    
+    .feed-form button {
+      padding: 0.5rem 1rem;
+      background-color: #007cba;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .feed-list {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .feed-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+    
+    .feed-item button {
+      background-color: #dc3545;
+      color: white;
+      border: none;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    /* 記事表示 */
+    .controls {
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 1rem;
+      align-items: center;
+    }
+    
+    .controls button {
+      padding: 0.5rem 1rem;
+      background-color: #28a745;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .section {
+      margin-bottom: 2rem;
+    }
+    
+    .section h2 {
+      margin-top: 2rem;
+      font-size: 1.5rem;
+      color: #333;
+      border-bottom: 2px solid #ddd;
+      padding-bottom: 0.5rem;
+    }
+    
+    .article {
+      margin-bottom: 1rem;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background-color: #f9f9f9;
+    }
+    
+    .article h3 {
+      margin: 0 0 0.5rem;
+      font-size: 1.1rem;
+    }
+    
+    .article a {
+      text-decoration: none;
+      color: #007cba;
+    }
+    
+    .article a:hover {
+      text-decoration: underline;
+    }
+    
+    .article p {
+      margin: 0.5rem 0;
+      color: #666;
+    }
+    
+    .article .meta {
+      font-size: 0.9rem;
+      color: #888;
+      margin: 0.5rem 0;
+    }
+    
+    .article .actions {
+      margin-top: 0.5rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .article button {
+      font-size: 0.8rem;
+      padding: 0.3rem 0.6rem;
+      border: 1px solid #999;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    
+    .read-button {
+      background-color: #28a745;
+      color: white;
+      border-color: #28a745;
+    }
+    
+    .summary-button {
+      background-color: #007cba;
+      color: white;
+      border-color: #007cba;
+    }
+    
+    .summary-button:disabled {
+      background-color: #6c757d;
+      border-color: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    .summary {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background-color: #e9ecef;
+      border-radius: 4px;
+      border-left: 4px solid #007cba;
+    }
+    
+    .transcript-status {
+      font-size: 0.8rem;
+      margin-left: 0.5rem;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      background-color: #f8f9fa;
+    }
+    
+    .error-message {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    
+    .loading {
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    .error {
+      color: #dc3545;
+    }
+    
+    .progress-indicator {
+      display: inline-block;
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #007cba;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 0.5rem;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* モーダルスタイル */
+    .modal {
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      overflow: auto;
+      background-color: rgba(0,0,0,0.4);
+    }
+    
+    .modal-content {
+      background-color: #fefefe;
+      margin: 10% auto;
+      padding: 0;
+      border: none;
+      border-radius: 8px;
+      width: 80%;
+      max-width: 600px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .modal-header {
+      padding: 1rem;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .modal-header h3 {
+      margin: 0;
+      color: #333;
+    }
+    
+    .close {
+      color: #aaa;
+      font-size: 28px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    
+    .close:hover,
+    .close:focus {
+      color: #000;
+      text-decoration: none;
+    }
+    
+    .modal-body {
+      padding: 1rem;
+    }
+    
+    .modal-body textarea {
+      width: 100%;
+      margin: 1rem 0;
+      padding: 0.5rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: inherit;
+      resize: vertical;
+    }
+    
+    .modal-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+      margin-top: 1rem;
+    }
+    
+    .modal-actions button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
+      background-color: white;
+    }
+    
+    .modal-actions button.primary {
+      background-color: #007cba;
+      color: white;
+      border-color: #007cba;
+    }
+    
+    .manual-summary-button {
+      background-color: #28a745;
+      color: white;
+      border-color: #28a745;
+    }
+    
+    /* プログレスバー */
+    .progress-container {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background-color: #f8f9fa;
+      border-radius: 4px;
+      border-left: 4px solid #007cba;
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background-color: #e9ecef;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 0.5rem;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #007cba, #28a745);
+      border-radius: 4px;
+      transition: width 0.3s ease;
+      animation: progress-animation 2s infinite;
+    }
+    
+    @keyframes progress-animation {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+    
+    .progress-text {
+      font-size: 0.9rem;
+      color: #495057;
+      display: flex;
+      align-items: center;
+    }
+    
+    .progress-text::before {
+      content: '';
+      display: inline-block;
+      width: 1rem;
+      height: 1rem;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #007cba;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>RSS Feed情報収集ツール</h1>
+  
+  <div style="background: #f0f8ff; padding: 1rem; margin-bottom: 1rem; border-left: 4px solid #007cba; border-radius: 4px;">
+    <strong>📖 GitHub Pages デモ版</strong><br>
+    これは静的表示用のデモです。完全な機能（RSS取得、AI要約等）はバックエンドサーバーが必要です。<br>
+    <a href="https://github.com/tana-data/info-feed-app" target="_blank">📁 ソースコード・ドキュメントはこちら</a>
+  </div>
+  
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('articles')">記事一覧</button>
+    <button class="tab" onclick="switchTab('feeds')">Feed管理</button>
+  </div>
+  
+  <!-- 記事一覧タブ -->
+  <div id="articles-tab" class="tab-content active">
+    <div class="controls">
+      <button onclick="refreshArticles()">記事を更新</button>
+      <label>
+        <input type="checkbox" id="unread-only" checked onchange="loadArticles(false)">
+        未読のみ表示
+      </label>
+    </div>
+    <div id="articles-container"></div>
+  </div>
+  
+  <!-- Feed管理タブ -->
+  <div id="feeds-tab" class="tab-content">
+    <div class="feed-form">
+      <h3>RSS Feed を追加</h3>
+      <input type="url" id="feed-url" placeholder="RSS Feed URL を入力">
+      <button onclick="addFeed()">追加</button>
+    </div>
+    
+    <h3>登録済みFeed</h3>
+    <ul id="feeds-list" class="feed-list"></ul>
+  </div>
+
+  <!-- 手動要約モーダル -->
+  <div id="manual-summary-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>手動テキスト入力で要約</h3>
+        <span class="close" onclick="closeManualSummaryModal()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p>動画や記事の内容を下記に入力してください。AIが要約を生成します。</p>
+        <textarea id="manual-text-input" placeholder="内容を入力してください..." rows="8"></textarea>
+        <div class="modal-actions">
+          <button onclick="closeManualSummaryModal()">キャンセル</button>
+          <button onclick="submitManualSummary()" class="primary">要約を作成</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = '';
+    
+    // 日本語テキストを指定文字数で切り捨てる関数
+    function truncateText(text, maxLength = 100) {
+      if (!text || typeof text !== 'string') return '';
+      
+      // 日本語文字を数える（全角文字・半角文字を区別しない）
+      if (text.length <= maxLength) {
+        return text;
+      }
+      
+      // maxLength文字で切り捨て、最後に「...」を追加
+      const truncated = text.substring(0, maxLength);
+      
+      // 文の途中で切れないように、可能なら句点で切る
+      const lastPunctuation = Math.max(
+        truncated.lastIndexOf('。'),
+        truncated.lastIndexOf('、'),
+        truncated.lastIndexOf('！'),
+        truncated.lastIndexOf('？'),
+        truncated.lastIndexOf('.'),
+        truncated.lastIndexOf(','),
+        truncated.lastIndexOf('!'),
+        truncated.lastIndexOf('?')
+      );
+      
+      if (lastPunctuation > maxLength * 0.7) {
+        // 句点が70%以降にある場合はそこで切る
+        return truncated.substring(0, lastPunctuation + 1) + '...';
+      } else {
+        // そうでなければそのまま切る
+        return truncated + '...';
+      }
+    }
+    
+    // タブ切り替え
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById(tabName + '-tab').classList.add('active');
+      
+      if (tabName === 'articles') {
+        loadArticles();
+      } else if (tabName === 'feeds') {
+        loadFeeds();
+      }
+    }
+    
+    // 記事一覧の読み込み
+    let currentOffset = 0;
+    const articlesPerPage = 10;
+    
+    async function loadArticles(loadMore = false) {
+      const unreadOnly = document.getElementById('unread-only').checked;
+      const container = document.getElementById('articles-container');
+      
+      if (!loadMore) {
+        currentOffset = 0;
+        container.innerHTML = '';
+      }
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/articles?unread_only=${unreadOnly}&limit=${articlesPerPage}&offset=${currentOffset}`);
+        const data = await response.json();
+        
+        if (data.articles.length === 0) {
+          if (currentOffset === 0) {
+            container.innerHTML = '<p>記事がありません</p>';
+          }
+          return;
+        }
+        
+        // コンテンツタイプごとにグループ化
+        const typeLabels = {
+          'youtube': 'YouTube動画',
+          'podcast': 'Podcast',
+          'article': 'Web記事'
+        };
+        
+        if (loadMore) {
+          // 追加読み込みの場合、既存のコンテンツに追加
+          data.articles.forEach(article => {
+            const existingSection = container.querySelector(`[data-type="${article.content_type}"]`);
+            if (existingSection) {
+              const articleEl = createArticleElement(article);
+              existingSection.appendChild(articleEl);
+            } else {
+              // 新しいタイプの場合は新しいセクションを作成
+              const section = document.createElement('div');
+              section.className = 'section';
+              section.dataset.type = article.content_type;
+              
+              const header = document.createElement('h2');
+              header.textContent = typeLabels[article.content_type] || article.content_type;
+              section.appendChild(header);
+              
+              const articleEl = createArticleElement(article);
+              section.appendChild(articleEl);
+              
+              container.appendChild(section);
+            }
+          });
+        } else {
+          // 初回読み込みの場合
+          Object.entries(data.grouped).forEach(([type, articles]) => {
+            const section = document.createElement('div');
+            section.className = 'section';
+            section.dataset.type = type;
+            
+            const header = document.createElement('h2');
+            header.textContent = typeLabels[type] || type;
+            section.appendChild(header);
+            
+            articles.forEach(article => {
+              const articleEl = createArticleElement(article);
+              section.appendChild(articleEl);
+            });
+            
+            container.appendChild(section);
+          });
+        }
+        
+        currentOffset += data.articles.length;
+        
+        // 「もっと見る」ボタンを更新
+        updateLoadMoreButton(data.articles.length === articlesPerPage);
+        
+      } catch (error) {
+        console.error('Error loading articles:', error);
+        if (currentOffset === 0) {
+          container.innerHTML = '<p class="error">記事の読み込みに失敗しました</p>';
+        }
+      }
+    }
+    
+    function updateLoadMoreButton(hasMore) {
+      let loadMoreBtn = document.getElementById('load-more-btn');
+      
+      if (hasMore) {
+        if (!loadMoreBtn) {
+          loadMoreBtn = document.createElement('button');
+          loadMoreBtn.id = 'load-more-btn';
+          loadMoreBtn.textContent = 'もっと見る';
+          loadMoreBtn.style.cssText = 'display: block; margin: 20px auto; padding: 10px 20px; background: #007cba; color: white; border: none; border-radius: 4px; cursor: pointer;';
+          loadMoreBtn.onclick = () => loadArticles(true);
+          
+          const container = document.getElementById('articles-container');
+          container.parentNode.insertBefore(loadMoreBtn, container.nextSibling);
+        }
+        loadMoreBtn.style.display = 'block';
+      } else {
+        if (loadMoreBtn) {
+          loadMoreBtn.style.display = 'none';
+        }
+      }
+    }
+    
+    // 記事要素の作成
+    function createArticleElement(article) {
+      const div = document.createElement('div');
+      div.className = 'article';
+      div.dataset.id = article.id;
+      
+      const pubDate = new Date(article.pub_date).toLocaleDateString('ja-JP');
+      
+      div.innerHTML = `
+        <h3><a href="${article.link}" target="_blank">${article.title}</a></h3>
+        <p>${truncateText(article.description || '', 100)}</p>
+        <div class="meta">
+          ${article.feed_title} / ${pubDate}
+          ${article.content_type === 'youtube' ? '<span class="transcript-status" id="transcript-status-' + article.id + '">🔍 コンテンツ確認中...</span>' : ''}
+        </div>
+        <div class="actions">
+          <button class="read-button" onclick="markAsRead(${article.id})">
+            ✓ 既読にする
+          </button>
+          ${article.content_type === 'youtube' ? 
+            `<button class="youtube-summary-button" id="youtube-summary-btn-${article.id}" onclick="requestYouTubeSummary(${article.id})" 
+                     ${article.summary_status === 'processing' ? 'disabled' : ''}>
+              🎬 動画要約
+            </button>` : ''}
+          ${article.content_type === 'podcast' ? 
+            `<button class="audio-summary-button" id="audio-summary-btn-${article.id}" onclick="requestAudioSummary(${article.id})" 
+                     ${article.summary_status === 'processing' ? 'disabled' : ''}>
+              🎧 音声要約
+            </button>` : ''}
+          <button class="manual-summary-button" onclick="showManualSummaryModal(${article.id})">
+            ✏️ 手動要約
+          </button>
+        </div>
+        ${article.summary_text ? `<div class="summary">${truncateText(article.summary_text, 100)}</div>` : ''}
+        <div class="progress-container" id="progress-container-${article.id}" style="display: none;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill-${article.id}"></div>
+          </div>
+          <div class="progress-text" id="progress-text-${article.id}">処理中...</div>
+        </div>
+        <div class="error-message" id="error-message-${article.id}" style="display: none;"></div>
+      `;
+      
+      // YouTube動画の場合は字幕チェックを実行
+      if (article.content_type === 'youtube') {
+        checkTranscriptAvailability(article.id);
+      }
+      
+      return div;
+    }
+    
+    function getSummaryButtonText(status) {
+      switch (status) {
+        case 'pending': return '要約を作成';
+        case 'processing': return '要約中...';
+        case 'completed': return '要約完了';
+        case 'failed': return '要約失敗';
+        default: return '要約を作成';
+      }
+    }
+    
+    // 既読マーク
+    async function markAsRead(articleId) {
+      try {
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/read`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ read_status: true })
+        });
+        
+        if (response.ok) {
+          const articleEl = document.querySelector(`[data-id="${articleId}"]`);
+          if (articleEl) {
+            articleEl.remove();
+          }
+        }
+      } catch (error) {
+        console.error('Error marking as read:', error);
+      }
+    }
+    
+    // 音声要約リクエスト関数を追加
+    async function requestAudioSummary(articleId) {
+      // ユーザー確認
+      const confirmed = confirm('音声からの要約を開始しますか？\n\n・処理時間: 3-5分程度\n・APIコストが発生します\n・途中でキャンセルはできません');
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      const button = document.getElementById(`audio-summary-btn-${articleId}`);
+      const progressContainer = document.getElementById(`progress-container-${articleId}`);
+      const progressText = document.getElementById(`progress-text-${articleId}`);
+      const progressFill = document.getElementById(`progress-fill-${articleId}`);
+      const errorContainer = document.getElementById(`error-message-${articleId}`);
+      
+      try {
+        // UI更新
+        button.disabled = true;
+        button.textContent = '音声処理中...';
+        progressContainer.style.display = 'block';
+        errorContainer.style.display = 'none';
+        
+        // 音声要約リクエストを送信
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audio_summary: true })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // 進行状況を監視
+          monitorAudioSummaryProgress(articleId);
+        } else {
+          throw new Error(data.error || '音声要約の開始に失敗しました');
+        }
+        
+      } catch (error) {
+        console.error('Audio summary error:', error);
+        
+        // エラー表示
+        errorContainer.textContent = `エラー: ${error.message}`;
+        errorContainer.style.display = 'block';
+        progressContainer.style.display = 'none';
+        
+        // ボタンを元に戻す
+        button.disabled = false;
+        button.textContent = '🎧 音声要約';
+      }
+    }
+    
+    // YouTube動画要約リクエスト関数
+    async function requestYouTubeSummary(articleId) {
+      // ユーザー確認
+      const confirmed = confirm('YouTube動画の要約を開始しますか？\n\n・字幕がある場合: 1-2分程度\n・字幕がない場合: 3-5分程度（音声処理）\n・APIコストが発生します\n・途中でキャンセルはできません');
+      
+      if (!confirmed) {
+        return;
+      }
+      
+      const button = document.getElementById(`youtube-summary-btn-${articleId}`);
+      const progressContainer = document.getElementById(`progress-container-${articleId}`);
+      const errorContainer = document.getElementById(`error-message-${articleId}`);
+      
+      try {
+        // UI更新
+        button.disabled = true;
+        button.textContent = '動画処理中...';
+        progressContainer.style.display = 'block';
+        errorContainer.style.display = 'none';
+        
+        // YouTube要約リクエストを送信
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ youtube_summary: true })
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // 進行状況を監視
+          monitorYouTubeSummaryProgress(articleId);
+        } else {
+          throw new Error(data.error || 'YouTube要約の開始に失敗しました');
+        }
+        
+      } catch (error) {
+        console.error('YouTube summary error:', error);
+        
+        // エラー表示
+        errorContainer.textContent = `エラー: ${error.message}`;
+        errorContainer.style.display = 'block';
+        progressContainer.style.display = 'none';
+        
+        // ボタンを元に戻す
+        button.disabled = false;
+        button.textContent = '🎬 動画要約';
+      }
+    }
+    
+    // 音声要約進行状況監視
+    async function monitorAudioSummaryProgress(articleId) {
+      const progressText = document.getElementById(`progress-text-${articleId}`);
+      const progressFill = document.getElementById(`progress-fill-${articleId}`);
+      const button = document.getElementById(`audio-summary-btn-${articleId}`);
+      
+      const stages = [
+        { text: '音声ダウンロード中...', progress: 20 },
+        { text: '音声転写中...', progress: 60 },
+        { text: '要約生成中...', progress: 90 }
+      ];
+      
+      let currentStage = 0;
+      
+      const updateProgress = () => {
+        if (currentStage < stages.length) {
+          const stage = stages[currentStage];
+          progressText.textContent = stage.text;
+          progressFill.style.width = stage.progress + '%';
+          currentStage++;
+        }
+      };
+      
+      // 初期ステージ設定
+      updateProgress();
+      
+      // 定期的に進行状況をチェック
+      const progressInterval = setInterval(updateProgress, 10000); // 10秒ごと
+      
+      // 結果をポーリング
+      const checkResult = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/api/articles/${articleId}/summary`);
+          const data = await response.json();
+          
+          if ((data.request_status === 'completed' || data.summary_status === 'completed') && data.summary_text) {
+            clearInterval(progressInterval);
+            
+            // 成功時のUI更新
+            progressText.textContent = '要約完了！';
+            progressFill.style.width = '100%';
+            
+            setTimeout(() => {
+              document.getElementById(`progress-container-${articleId}`).style.display = 'none';
+              
+              const articleEl = document.querySelector(`[data-id="${articleId}"]`);
+              if (articleEl) {
+                let summaryDiv = articleEl.querySelector('.summary');
+                if (!summaryDiv) {
+                  summaryDiv = document.createElement('div');
+                  summaryDiv.className = 'summary';
+                  const actionsDiv = articleEl.querySelector('.actions');
+                  actionsDiv.insertAdjacentElement('afterend', summaryDiv);
+                }
+                // 改行を<br>に変換してサマリー全体を表示
+                summaryDiv.innerHTML = data.summary_text.replace(/\n/g, '<br>');
+              }
+              
+              // ボタンを更新
+              if (button) {
+                button.textContent = '要約完了';
+                button.disabled = true;
+              }
+            }, 1000);
+            
+          } else if (data.request_status === 'failed' || data.summary_status === 'failed') {
+            clearInterval(progressInterval);
+            
+            // 失敗時のUI更新
+            const errorContainer = document.getElementById(`error-message-${articleId}`);
+            errorContainer.textContent = `エラー: ${data.error || '音声要約に失敗しました'}`;
+            errorContainer.style.display = 'block';
+            document.getElementById(`progress-container-${articleId}`).style.display = 'none';
+            
+            button.disabled = false;
+            button.textContent = '🎧 音声要約';
+          } else {
+            // まだ処理中の場合、継続してチェック
+            setTimeout(checkResult, 5000); // 5秒後に再チェック
+          }
+          
+        } catch (error) {
+          console.error('Progress check error:', error);
+          setTimeout(checkResult, 10000); // エラー時は10秒後に再試行
+        }
+      };
+      
+      // 初回チェックを少し遅らせて実行
+      setTimeout(checkResult, 3000);
+    }
+    
+    // YouTube動画要約進行状況監視
+    async function monitorYouTubeSummaryProgress(articleId) {
+      const progressText = document.getElementById(`progress-text-${articleId}`);
+      const progressFill = document.getElementById(`progress-fill-${articleId}`);
+      const button = document.getElementById(`youtube-summary-btn-${articleId}`);
+      
+      const stages = [
+        { text: 'コンテンツ確認中...', progress: 10 },
+        { text: '字幕取得中...', progress: 30 },
+        { text: '音声ダウンロード中...', progress: 50 },
+        { text: '音声文字起こし中...', progress: 70 },
+        { text: '要約生成中...', progress: 90 }
+      ];
+      
+      let currentStage = 0;
+      
+      const updateProgress = () => {
+        if (currentStage < stages.length) {
+          const stage = stages[currentStage];
+          progressText.textContent = stage.text;
+          progressFill.style.width = stage.progress + '%';
+          currentStage++;
+        }
+      };
+      
+      // 初期ステージ設定
+      updateProgress();
+      
+      // 定期的に進行状況をチェック
+      const progressInterval = setInterval(updateProgress, 15000); // 15秒ごと
+      
+      // 結果をポーリング
+      const checkResult = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/api/articles/${articleId}/summary`);
+          const data = await response.json();
+          
+          if ((data.request_status === 'completed' || data.summary_status === 'completed') && data.summary_text) {
+            clearInterval(progressInterval);
+            
+            // 成功時のUI更新
+            progressText.textContent = '要約完了！';
+            progressFill.style.width = '100%';
+            
+            setTimeout(() => {
+              document.getElementById(`progress-container-${articleId}`).style.display = 'none';
+              
+              const articleEl = document.querySelector(`[data-id="${articleId}"]`);
+              if (articleEl) {
+                let summaryDiv = articleEl.querySelector('.summary');
+                if (!summaryDiv) {
+                  summaryDiv = document.createElement('div');
+                  summaryDiv.className = 'summary';
+                  const actionsDiv = articleEl.querySelector('.actions');
+                  actionsDiv.insertAdjacentElement('afterend', summaryDiv);
+                }
+                // 改行を<br>に変換してサマリー全体を表示
+                summaryDiv.innerHTML = data.summary_text.replace(/\n/g, '<br>');
+              }
+              
+              // ボタンを更新
+              if (button) {
+                button.textContent = '要約完了';
+                button.disabled = true;
+              }
+            }, 1000);
+            
+          } else if (data.request_status === 'failed' || data.summary_status === 'failed') {
+            clearInterval(progressInterval);
+            
+            // エラー表示
+            const errorContainer = document.getElementById(`error-message-${articleId}`);
+            if (errorContainer) {
+              errorContainer.textContent = `エラー: ${data.error_message || 'YouTube要約に失敗しました'}`;
+              errorContainer.style.display = 'block';
+            }
+            
+            document.getElementById(`progress-container-${articleId}`).style.display = 'none';
+            
+            // ボタンを元に戻す
+            if (button) {
+              button.disabled = false;
+              button.textContent = '🎬 動画要約';
+            }
+          } else {
+            // まだ処理中 - 次回チェック
+            setTimeout(checkResult, 10000);
+          }
+        } catch (error) {
+          console.error('YouTube summary progress check error:', error);
+          setTimeout(checkResult, 10000); // エラー時は10秒後に再試行
+        }
+      };
+      
+      // 初回チェックを少し遅らせて実行
+      setTimeout(checkResult, 3000);
+    }
+    
+    // YouTube コンテンツ利用可能性をチェック
+    async function checkTranscriptAvailability(articleId) {
+      try {
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/content-check`);
+        const data = await response.json();
+        
+        const statusElement = document.getElementById(`transcript-status-${articleId}`);
+        const summaryButton = document.getElementById(`summary-btn-${articleId}`);
+        
+        if (statusElement) {
+          if (data.available) {
+            const methodText = data.methods && data.methods.length > 0 ? 
+              (data.methods.includes('transcript') ? '📄 字幕利用可能' : '📝 説明文利用可能') : 
+              '✅ 要約可能';
+            statusElement.textContent = methodText;
+            statusElement.style.color = '#28a745';
+          } else {
+            statusElement.textContent = '❌ 要約不可';
+            statusElement.style.color = '#dc3545';
+            if (summaryButton) {
+              summaryButton.disabled = true;
+              summaryButton.textContent = 'コンテンツなし（要約不可）';
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Content check failed:', error);
+        const statusElement = document.getElementById(`transcript-status-${articleId}`);
+        if (statusElement) {
+          statusElement.textContent = '❓ 確認失敗';
+          statusElement.style.color = '#6c757d';
+        }
+      }
+    }
+
+    // 要約リクエスト
+    async function requestSummary(articleId) {
+      console.log(`🎬 Starting requestSummary for article ${articleId}`);
+      
+      const button = document.getElementById(`summary-btn-${articleId}`);
+      const errorElement = document.getElementById(`error-message-${articleId}`);
+      const progressContainer = document.getElementById(`progress-container-${articleId}`);
+      
+      console.log(`🔍 UI elements found:`, {
+        hasButton: !!button,
+        hasErrorElement: !!errorElement,
+        hasProgressContainer: !!progressContainer
+      });
+      
+      try {
+        // エラーメッセージを隠す
+        if (errorElement) {
+          errorElement.style.display = 'none';
+          console.log(`🗑️ Hidden error element for article ${articleId}`);
+        }
+        
+        console.log(`📡 Sending POST request to /api/articles/${articleId}/summarize`);
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/summarize`, {
+          method: 'POST'
+        });
+        
+        console.log(`📡 Summary request response: ${response.status} ${response.statusText}`);
+        
+        if (response.ok) {
+          const responseData = await response.json();
+          console.log(`✅ Summary request successful:`, responseData);
+          
+          if (button) {
+            button.disabled = true;
+            button.textContent = '要約中...';
+            console.log(`🔘 Button updated for article ${articleId}: disabled=true, text='要約中...'`);
+          }
+          
+          // プログレスバーを表示
+          console.log(`📊 Showing progress for article ${articleId}`);
+          showProgress(articleId, '要約処理を開始しています...');
+          
+          // 要約完了を定期的にチェック
+          console.log(`🔄 Starting polling for article ${articleId}`);
+          checkSummaryProgress(articleId);
+          console.log(`✅ checkSummaryProgress called for article ${articleId}`);
+        } else {
+          const errorData = await response.json();
+          console.log(`❌ Summary request failed:`, errorData);
+          showError(articleId, errorData.error || '要約リクエストに失敗しました');
+        }
+      } catch (error) {
+        console.error(`❌ Error in requestSummary for article ${articleId}:`, error);
+        showError(articleId, 'ネットワークエラーが発生しました');
+      }
+    }
+    
+    // 要約進行状況をチェック
+    async function checkSummaryProgress(articleId, attempts = 0) {
+      console.log(`🚀 Starting checkSummaryProgress for article ${articleId}, attempt ${attempts + 1}`);
+      
+      if (attempts > 30) { // 最大30回（約5分）
+        console.log(`⏰ Timeout reached for article ${articleId} after ${attempts} attempts`);
+        hideProgress(articleId);
+        showError(articleId, '要約処理がタイムアウトしました');
+        return;
+      }
+      
+      try {
+        console.log(`📡 Fetching summary status for article ${articleId}...`);
+        const response = await fetch(`${API_BASE}/api/articles/${articleId}/summary`);
+        console.log(`📡 Response status: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        // デバッグログ強化
+        console.log(`🔍 Full API response for article ${articleId}:`, data);
+        console.log(`🔍 Detailed checking summary for article ${articleId} (attempt ${attempts + 1}):`, {
+          summary_status: data.summary_status,
+          request_status: data.request_status,
+          has_summary_text: !!data.summary_text,
+          summary_length: data.summary_text ? data.summary_text.length : 0,
+          error_message: data.error_message,
+          request_created: data.request_created,
+          request_completed: data.request_completed
+        });
+        
+        // 条件チェックの詳細ログ
+        const isRequestCompleted = data.request_status === 'completed';
+        const isSummaryCompleted = data.summary_status === 'completed';
+        const hasSummaryText = !!data.summary_text;
+        
+        console.log(`🔍 Condition check:`, {
+          isRequestCompleted,
+          isSummaryCompleted,
+          hasSummaryText,
+          condition1: isRequestCompleted || isSummaryCompleted,
+          finalCondition: (isRequestCompleted || isSummaryCompleted) && hasSummaryText
+        });
+        
+        if ((isRequestCompleted || isSummaryCompleted) && hasSummaryText) {
+          // 要約完了
+          console.log(`✅ Summary completion detected for article ${articleId}!`);
+          console.log(`✅ Summary preview:`, data.summary_text.substring(0, 50) + '...');
+          
+          try {
+            hideProgress(articleId);
+            updateProgress(articleId, 100, '要約完了！');
+            console.log(`🎉 Progress updated to 100% for article ${articleId}`);
+            
+            setTimeout(() => {
+              console.log(`🔄 Displaying summary in-place for article ${articleId}`);
+              hideProgress(articleId);
+              
+              // 既存の記事要素を見つけて、その場で要約を表示
+              const articleEl = document.querySelector(`[data-id="${articleId}"]`);
+              if (articleEl) {
+                // 既存の要約エリアを探す
+                let summaryDiv = articleEl.querySelector('.summary');
+                if (!summaryDiv) {
+                  // 要約エリアが存在しない場合は新しく作成
+                  summaryDiv = document.createElement('div');
+                  summaryDiv.className = 'summary';
+                  
+                  // actionsの後に挿入
+                  const actionsDiv = articleEl.querySelector('.actions');
+                  if (actionsDiv) {
+                    actionsDiv.insertAdjacentElement('afterend', summaryDiv);
+                  }
+                }
+                
+                // 要約内容を表示（改行を<br>に変換）
+                summaryDiv.innerHTML = data.summary_text.replace(/\n/g, '<br>');
+                console.log(`📄 Summary displayed in-place for article ${articleId}`);
+                
+                // 要約ボタンを更新
+                const button = document.getElementById(`summary-btn-${articleId}`);
+                if (button) {
+                  button.textContent = '要約完了';
+                  button.disabled = true;
+                }
+                
+                // 音声要約ボタンも更新
+                const audioButton = document.getElementById(`audio-summary-btn-${articleId}`);
+                if (audioButton) {
+                  audioButton.textContent = '要約完了';
+                  audioButton.disabled = true;
+                }
+              } else {
+                // 記事要素が見つからない場合は従来通りリロード
+                console.log(`🔄 Article element not found, reloading articles for ${articleId}`);
+                loadArticles();
+              }
+            }, 1000);
+          } catch (uiError) {
+            console.error(`❌ UI update error for article ${articleId}:`, uiError);
+          }
+          
+        } else if (data.request_status === 'failed' || data.summary_status === 'failed') {
+          // 要約失敗
+          console.log(`❌ Summary failed for article ${articleId}:`, data.error_message);
+          hideProgress(articleId);
+          showError(articleId, data.error_message || '要約処理に失敗しました');
+          const button = document.getElementById(`summary-btn-${articleId}`);
+          if (button) {
+            button.disabled = false;
+            button.textContent = '要約を再試行';
+          }
+        } else {
+          // まだ処理中 - プログレス更新
+          console.log(`⏳ Still processing article ${articleId}, will check again in 10 seconds...`);
+          const progressText = getProgressText(attempts);
+          const progressValue = Math.min(90, (attempts / 30) * 90);
+          updateProgress(articleId, progressValue, progressText);
+          
+          console.log(`⏰ Setting timeout for next check of article ${articleId} in 10 seconds`);
+          setTimeout(() => {
+            console.log(`⏰ Timeout triggered, calling checkSummaryProgress again for article ${articleId}`);
+            checkSummaryProgress(articleId, attempts + 1);
+          }, 10000);
+        }
+      } catch (error) {
+        console.error(`❌ Error checking summary progress for article ${articleId}:`, error);
+        console.log(`⏰ Setting retry timeout for article ${articleId} in 10 seconds due to error`);
+        setTimeout(() => {
+          console.log(`⏰ Error retry timeout triggered for article ${articleId}`);
+          checkSummaryProgress(articleId, attempts + 1);
+        }, 10000);
+      }
+    }
+    
+    // プログレス表示
+    function showProgress(articleId, text) {
+      console.log(`📊 showProgress called for article ${articleId} with text: "${text}"`);
+      const progressContainer = document.getElementById(`progress-container-${articleId}`);
+      if (progressContainer) {
+        progressContainer.style.display = 'block';
+        console.log(`📊 Progress container shown for article ${articleId}`);
+        updateProgress(articleId, 10, text);
+      } else {
+        console.error(`❌ Progress container not found for article ${articleId}`);
+      }
+    }
+    
+    // プログレス更新
+    function updateProgress(articleId, percentage, text) {
+      console.log(`📊 updateProgress called for article ${articleId}: ${percentage}%, "${text}"`);
+      const progressFill = document.getElementById(`progress-fill-${articleId}`);
+      const progressText = document.getElementById(`progress-text-${articleId}`);
+      
+      if (progressFill) {
+        progressFill.style.width = `${percentage}%`;
+        console.log(`📊 Progress fill updated to ${percentage}% for article ${articleId}`);
+      } else {
+        console.error(`❌ Progress fill element not found for article ${articleId}`);
+      }
+      
+      if (progressText) {
+        progressText.textContent = text;
+        console.log(`📊 Progress text updated to "${text}" for article ${articleId}`);
+      } else {
+        console.error(`❌ Progress text element not found for article ${articleId}`);
+      }
+    }
+    
+    // プログレス非表示
+    function hideProgress(articleId) {
+      console.log(`📊 hideProgress called for article ${articleId}`);
+      const progressContainer = document.getElementById(`progress-container-${articleId}`);
+      if (progressContainer) {
+        progressContainer.style.display = 'none';
+        console.log(`📊 Progress container hidden for article ${articleId}`);
+      } else {
+        console.error(`❌ Progress container not found for hideProgress for article ${articleId}`);
+      }
+    }
+    
+    // 進行状況に応じたテキストを取得
+    function getProgressText(attempts) {
+      if (attempts < 5) {
+        return 'コンテンツを分析中...';
+      } else if (attempts < 10) {
+        return '音声を処理中...';
+      } else if (attempts < 20) {
+        return 'AI要約を生成中...';
+      } else {
+        return '最終処理中...';
+      }
+    }
+    
+    // エラーメッセージを表示
+    function showError(articleId, message) {
+      const errorElement = document.getElementById(`error-message-${articleId}`);
+      if (errorElement) {
+        // エラーメッセージを改善して表示
+        let improvedMessage = message;
+        
+        // 音声ファイルサイズエラーの場合、代替案を提示
+        if (message.includes('音声ファイルが大きすぎます') || message.includes('Audio file too large')) {
+          improvedMessage += '\n\n💡 対処法：\n・より短い音声ファイルをお試しください\n・手動要約機能をご利用ください';
+        }
+        
+        // RSS feedエラーの場合、代替案を提示
+        if (message.includes('RSS Feed') || message.includes('RSS')) {
+          improvedMessage += '\n\n💡 対処法：\n・手動要約機能をご利用ください\n・直接音声ファイルURLがある場合はそちらをお試しください';
+        }
+        
+        // Whisper APIエラーの場合、代替案を提示
+        if (message.includes('音声認識') || message.includes('転写')) {
+          improvedMessage += '\n\n💡 対処法：\n・音声ファイルの品質を確認してください\n・手動要約機能をご利用ください';
+        }
+        
+        errorElement.innerHTML = improvedMessage.replace(/\n/g, '<br>');
+        errorElement.style.display = 'block';
+        errorElement.style.color = '#dc3545';
+        errorElement.style.backgroundColor = '#f8d7da';
+        errorElement.style.border = '1px solid #f5c6cb';
+        errorElement.style.borderRadius = '4px';
+        errorElement.style.padding = '0.5rem';
+        errorElement.style.marginTop = '0.5rem';
+        errorElement.style.fontSize = '0.9rem';
+        errorElement.style.lineHeight = '1.4';
+      }
+    }
+    
+    // 記事更新
+    async function refreshArticles() {
+      try {
+        const response = await fetch(`${API_BASE}/api/feeds/refresh`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          alert(`${data.processedCount} 個のFeedを更新しました`);
+          loadArticles();
+        }
+      } catch (error) {
+        console.error('Error refreshing articles:', error);
+      }
+    }
+    
+    // Feed管理
+    async function loadFeeds() {
+      try {
+        const response = await fetch(`${API_BASE}/api/feeds`);
+        const feeds = await response.json();
+        
+        const list = document.getElementById('feeds-list');
+        list.innerHTML = '';
+        
+        feeds.forEach(feed => {
+          const li = document.createElement('li');
+          li.className = 'feed-item';
+          li.innerHTML = `
+            <div>
+              <strong>${feed.title || 'タイトルなし'}</strong><br>
+              <small>${feed.url}</small>
+            </div>
+            <button onclick="deleteFeed(${feed.id})">削除</button>
+          `;
+          list.appendChild(li);
+        });
+      } catch (error) {
+        console.error('Error loading feeds:', error);
+      }
+    }
+    
+    async function addFeed() {
+      const url = document.getElementById('feed-url').value.trim();
+      if (!url) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/feeds`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        
+        if (response.ok) {
+          document.getElementById('feed-url').value = '';
+          loadFeeds();
+          alert('Feedを追加しました');
+        } else {
+          const error = await response.json();
+          alert(`エラー: ${error.error}`);
+        }
+      } catch (error) {
+        console.error('Error adding feed:', error);
+        alert('Feedの追加に失敗しました');
+      }
+    }
+    
+    async function deleteFeed(feedId) {
+      if (!confirm('このFeedを削除しますか？')) return;
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/feeds/${feedId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          loadFeeds();
+        }
+      } catch (error) {
+        console.error('Error deleting feed:', error);
+      }
+    }
+    
+    // 手動要約モーダル関連
+    let currentArticleId = null;
+    
+    function showManualSummaryModal(articleId) {
+      currentArticleId = articleId;
+      const modal = document.getElementById('manual-summary-modal');
+      const textInput = document.getElementById('manual-text-input');
+      
+      textInput.value = '';
+      modal.style.display = 'block';
+      textInput.focus();
+    }
+    
+    function closeManualSummaryModal() {
+      const modal = document.getElementById('manual-summary-modal');
+      modal.style.display = 'none';
+      currentArticleId = null;
+    }
+    
+    async function submitManualSummary() {
+      const textInput = document.getElementById('manual-text-input');
+      const manualText = textInput.value.trim();
+      
+      if (!manualText) {
+        alert('テキストを入力してください。');
+        return;
+      }
+      
+      if (!currentArticleId) {
+        alert('エラー: 記事IDが見つかりません。');
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${API_BASE}/api/articles/${currentArticleId}/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ manual_text: manualText })
+        });
+        
+        if (response.ok) {
+          closeManualSummaryModal();
+          
+          // 要約処理中の表示を更新
+          const button = document.getElementById(`summary-btn-${currentArticleId}`);
+          if (button) {
+            button.disabled = true;
+            button.textContent = '要約中...';
+          }
+          
+          // プログレスバーを表示
+          showProgress(currentArticleId, '手動テキストを処理中...');
+          
+          // 進行状況をチェック
+          checkSummaryProgress(currentArticleId);
+          
+        } else {
+          const errorData = await response.json();
+          alert(`エラー: ${errorData.error || '要約リクエストに失敗しました'}`);
+        }
+      } catch (error) {
+        console.error('Error submitting manual summary:', error);
+        alert('ネットワークエラーが発生しました。');
+      }
+    }
+    
+    // モーダル外クリックで閉じる
+    window.onclick = function(event) {
+      const modal = document.getElementById('manual-summary-modal');
+      if (event.target === modal) {
+        closeManualSummaryModal();
+      }
+    }
+    
+    // 初期化
+    document.addEventListener('DOMContentLoaded', () => {
+      loadArticles();
+    });
+  </script>
+</body>
+</html>
