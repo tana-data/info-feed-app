@@ -76,25 +76,58 @@ router.post('/refresh', async (req, res) => {
         try {
           const parsedFeed = await parser.parseURL(feed.url);
           
-          for (const item of parsedFeed.items) {
+          // 最新5件のみに制限し、日付順でソート
+          const sortedItems = parsedFeed.items
+            .sort((a, b) => new Date(b.pubDate || b.isoDate || 0) - new Date(a.pubDate || a.isoDate || 0))
+            .slice(0, 5);
+
+          console.log(`📊 Processing ${sortedItems.length} articles from feed: ${feed.title || feed.url}`);
+          
+          let newArticlesCount = 0;
+          for (const item of sortedItems) {
             const guid = item.guid || item.link;
             const contentType = detectContentType(item.link);
             
-            db.run(
-              `INSERT OR IGNORE INTO articles 
-               (feed_id, guid, title, link, description, pub_date, content_type) 
-               VALUES (?, ?, ?, ?, ?, ?, ?)`,
-              [
-                feed.id,
-                guid,
-                item.title || '',
-                item.link || '',
-                item.contentSnippet || item.content || '',
-                item.pubDate || item.isoDate || new Date().toISOString(),
-                contentType
-              ]
-            );
+            // 既存記事チェック（より厳密な重複防止）
+            const existingArticle = await new Promise((resolve, reject) => {
+              db.get(
+                'SELECT id FROM articles WHERE guid = ? OR (link = ? AND feed_id = ?)',
+                [guid, item.link, feed.id],
+                (err, row) => {
+                  if (err) reject(err);
+                  else resolve(row);
+                }
+              );
+            });
+
+            if (!existingArticle) {
+              await new Promise((resolve, reject) => {
+                db.run(
+                  `INSERT INTO articles 
+                   (feed_id, guid, title, link, description, pub_date, content_type) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                  [
+                    feed.id,
+                    guid,
+                    item.title || '',
+                    item.link || '',
+                    item.contentSnippet || item.content || '',
+                    item.pubDate || item.isoDate || new Date().toISOString(),
+                    contentType
+                  ],
+                  function(err) {
+                    if (err) reject(err);
+                    else {
+                      newArticlesCount++;
+                      resolve();
+                    }
+                  }
+                );
+              });
+            }
           }
+          
+          console.log(`✅ Added ${newArticlesCount} new articles from feed: ${feed.title || feed.url}`);
           
           db.run('UPDATE feeds SET last_updated = CURRENT_TIMESTAMP WHERE id = ?', [feed.id]);
           processedCount++;
@@ -105,7 +138,8 @@ router.post('/refresh', async (req, res) => {
       
       res.json({ 
         message: `Processed ${processedCount} feeds`,
-        processedCount 
+        processedCount,
+        details: 'Limited to latest 5 articles per feed with duplicate prevention'
       });
     });
   } catch (error) {
