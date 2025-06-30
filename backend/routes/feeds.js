@@ -23,26 +23,46 @@ router.post('/', async (req, res) => {
   try {
     const feed = await parser.parseURL(url);
     
-    db.run(
-      'INSERT INTO feeds (url, title, description, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-      [url, feed.title || '', feed.description || ''],
-      function(err) {
-        if (err) {
-          if (err.code === 'SQLITE_CONSTRAINT') {
-            return res.status(409).json({ error: 'Feed already exists' });
-          }
-          return res.status(500).json({ error: err.message });
-        }
-        
-        res.status(201).json({
-          id: this.lastID,
-          url,
-          title: feed.title || '',
-          description: feed.description || '',
-          message: 'Feed added successfully'
-        });
+    // 既存のFeed（削除済み含む）をチェック
+    db.get('SELECT id, is_active FROM feeds WHERE url = ?', [url], (err, existingFeed) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
       }
-    );
+      
+      if (existingFeed) {
+        if (existingFeed.is_active === 1) {
+          return res.status(409).json({ error: 'Feed already exists' });
+        } else {
+          // 削除済みFeedを再アクティブ化
+          db.run(
+            'UPDATE feeds SET is_active = 1, title = ?, description = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
+            [feed.title || '', feed.description || '', existingFeed.id],
+            function(err) {
+              if (err) {
+                return res.status(500).json({ error: err.message });
+              }
+              
+              // 最新5記事を取得して追加
+              processNewFeedArticles(existingFeed.id, url, feed.title || '', res);
+            }
+          );
+        }
+      } else {
+        // 新規Feed追加
+        db.run(
+          'INSERT INTO feeds (url, title, description, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+          [url, feed.title || '', feed.description || ''],
+          function(err) {
+            if (err) {
+              return res.status(500).json({ error: err.message });
+            }
+            
+            // 最新5記事を取得して追加
+            processNewFeedArticles(this.lastID, url, feed.title || '', res);
+          }
+        );
+      }
+    });
   } catch (error) {
     res.status(400).json({ error: 'Invalid RSS feed URL or unable to parse feed' });
   }
@@ -146,6 +166,78 @@ router.post('/refresh', async (req, res) => {
     res.status(500).json({ error: 'Failed to refresh feeds' });
   }
 });
+
+// 新規Feed追加時の記事処理（最新5件のみ）
+async function processNewFeedArticles(feedId, feedUrl, feedTitle, res) {
+  try {
+    const parsedFeed = await parser.parseURL(feedUrl);
+    
+    // 最新5件のみに制限し、日付順でソート
+    const sortedItems = parsedFeed.items
+      .sort((a, b) => new Date(b.pubDate || b.isoDate || 0) - new Date(a.pubDate || a.isoDate || 0))
+      .slice(0, 5);
+
+    console.log(`📊 Adding ${sortedItems.length} initial articles for new feed: ${feedTitle}`);
+    
+    let newArticlesCount = 0;
+    for (const item of sortedItems) {
+      const guid = item.guid || item.link;
+      const contentType = detectContentType(item.link);
+      
+      try {
+        await new Promise((resolve, reject) => {
+          db.run(
+            `INSERT INTO articles 
+             (feed_id, guid, title, link, description, pub_date, content_type) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [
+              feedId,
+              guid,
+              item.title || '',
+              item.link || '',
+              item.contentSnippet || item.content || '',
+              item.pubDate || item.isoDate || new Date().toISOString(),
+              contentType
+            ],
+            function(err) {
+              if (err) {
+                if (err.code !== 'SQLITE_CONSTRAINT') {
+                  console.error('Article insert error:', err);
+                }
+                resolve(); // 重複エラーは無視
+              } else {
+                newArticlesCount++;
+                resolve();
+              }
+            }
+          );
+        });
+      } catch (error) {
+        console.error('Error inserting article:', error);
+      }
+    }
+    
+    console.log(`✅ Successfully added ${newArticlesCount} articles for feed: ${feedTitle}`);
+    
+    res.status(201).json({
+      id: feedId,
+      url: feedUrl,
+      title: feedTitle,
+      message: `Feed added successfully with ${newArticlesCount} articles`,
+      articlesAdded: newArticlesCount
+    });
+    
+  } catch (error) {
+    console.error('Error processing new feed articles:', error);
+    res.status(201).json({
+      id: feedId,
+      url: feedUrl,
+      title: feedTitle,
+      message: 'Feed added successfully, but failed to fetch initial articles',
+      articlesAdded: 0
+    });
+  }
+}
 
 function detectContentType(url) {
   if (!url) return 'article';
