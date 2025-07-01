@@ -486,7 +486,7 @@
     
     // 記事一覧の読み込み
     let currentOffset = 0;
-    const articlesPerPage = 10;
+    const articlesPerPage = 25;  // 複数Feed登録時でも十分な表示数を確保
     
     async function loadArticles(loadMore = false) {
       const unreadOnly = document.getElementById('unread-only').checked;

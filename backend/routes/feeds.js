@@ -84,6 +84,38 @@ router.delete('/:id', (req, res) => {
   });
 });
 
+// Feed別記事件数確認エンドポイント
+router.get('/article-stats', (req, res) => {
+  db.all(`
+    SELECT 
+      f.id,
+      f.title,
+      f.url,
+      COUNT(a.id) as article_count,
+      MAX(a.pub_date) as latest_article_date
+    FROM feeds f
+    LEFT JOIN articles a ON f.id = a.feed_id
+    WHERE f.is_active = 1
+    GROUP BY f.id, f.title, f.url
+    ORDER BY article_count DESC
+  `, (err, rows) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    
+    const totalArticles = rows.reduce((sum, feed) => sum + feed.article_count, 0);
+    
+    res.json({
+      feeds: rows,
+      summary: {
+        total_feeds: rows.length,
+        total_articles: totalArticles,
+        avg_articles_per_feed: Math.round(totalArticles / rows.length * 100) / 100
+      }
+    });
+  });
+});
+
 router.post('/refresh', async (req, res) => {
   try {
     db.all('SELECT * FROM feeds WHERE is_active = 1', async (err, feeds) => {
@@ -102,6 +134,7 @@ router.post('/refresh', async (req, res) => {
             .slice(0, 5);
 
           console.log(`📊 Processing ${sortedItems.length} articles from feed: ${feed.title || feed.url}`);
+          console.log(`🔍 Feed ID: ${feed.id}, Total items in RSS: ${parsedFeed.items.length}, Limited to: ${sortedItems.length}`);
           
           let newArticlesCount = 0;
           for (const item of sortedItems) {
@@ -148,6 +181,7 @@ router.post('/refresh', async (req, res) => {
           }
           
           console.log(`✅ Added ${newArticlesCount} new articles from feed: ${feed.title || feed.url}`);
+          console.log(`📈 Feed ${feed.id} summary: ${sortedItems.length} processed, ${newArticlesCount} new articles added`);
           
           db.run('UPDATE feeds SET last_updated = CURRENT_TIMESTAMP WHERE id = ?', [feed.id]);
           processedCount++;
@@ -178,6 +212,7 @@ async function processNewFeedArticles(feedId, feedUrl, feedTitle, res) {
       .slice(0, 5);
 
     console.log(`📊 Adding ${sortedItems.length} initial articles for new feed: ${feedTitle}`);
+    console.log(`🔍 New Feed processing: Total items in RSS: ${parsedFeed.items.length}, Limited to: ${sortedItems.length}`);
     
     let newArticlesCount = 0;
     for (const item of sortedItems) {
