@@ -29,10 +29,14 @@ router.post('/', async (req, res) => {
         return res.status(500).json({ error: err.message });
       }
       
+      console.log(`Feed registration check: URL=${url}, Existing Feed:`, existingFeed);
+      
       if (existingFeed) {
         if (existingFeed.is_active === 1) {
+          console.log(`Feed already active: ID=${existingFeed.id}, URL=${url}`);
           return res.status(409).json({ error: 'Feed already exists' });
         } else {
+          console.log(`Reactivating deleted feed: ID=${existingFeed.id}, URL=${url}`);
           // 削除済みFeedを再アクティブ化
           db.run(
             'UPDATE feeds SET is_active = 1, title = ?, description = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',

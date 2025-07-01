@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RSS Feed情報収集ツール</title>
+  <title>情報収集ツール</title>
   <link rel="manifest" href="manifest.json">
   <style>
     body {
@@ -384,7 +384,7 @@
   </style>
 </head>
 <body>
-  <h1>RSS Feed情報収集ツール</h1>
+  <h1>情報収集ツール</h1>
   
   <div class="tabs">
     <button class="tab active" onclick="switchTab('articles')">記事一覧</button>
@@ -1307,6 +1307,18 @@
         if (response.ok) {
           const data = await response.json();
           alert(`${data.processedCount} 個のFeedを更新しました`);
+          
+          // 記事一覧をクリアしてから新しい記事のみを読み込み
+          const container = document.getElementById('articles-container');
+          container.innerHTML = '';
+          currentOffset = 0;
+          
+          // 未読記事のみを表示するためにチェックボックスをONにする
+          const unreadOnlyCheckbox = document.getElementById('unread-only');
+          if (unreadOnlyCheckbox) {
+            unreadOnlyCheckbox.checked = true;
+          }
+          
           loadArticles();
         }
       } catch (error) {
@@ -1352,12 +1364,18 @@
         });
         
         if (response.ok) {
+          const result = await response.json();
           document.getElementById('feed-url').value = '';
           loadFeeds();
-          alert('Feedを追加しました');
+          alert(result.message || 'Feedを追加しました');
         } else {
           const error = await response.json();
-          alert(`エラー: ${error.error}`);
+          console.error('Feed addition error:', error);
+          if (error.error === 'Feed already exists') {
+            alert('エラー: このFeedは既に登録されています。\n削除済みのFeedを再登録したい場合は、同じURLを再度入力してください。');
+          } else {
+            alert(`エラー: ${error.error}`);
+          }
         }
       } catch (error) {
         console.error('Error adding feed:', error);
