@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>localStorage テスト</title>
+</head>
+<body>
+    <h1>既読管理機能テスト</h1>
+    <div id="results"></div>
+    
+    <script>
+        const READ_KEY = 'readArticles';
+        const results = document.getElementById('results');
+        
+        function log(message) {
+            results.innerHTML += '<p>' + message + '</p>';
+            console.log(message);
+        }
+        
+        // TC_READ_001: 既読状態の保存機能検証
+        function testReadStatusSave() {
+            log('=== TC_READ_001: 既読状態の保存機能検証 ===');
+            
+            // 初期化
+            localStorage.removeItem(READ_KEY);
+            
+            // テスト用URL
+            const testUrl = 'https://example.com/test-article';
+            
+            // 既読前の状態確認
+            let readArticles = localStorage.getItem(READ_KEY);
+            log('初期状態: ' + (readArticles || 'null'));
+            
+            // 既読として保存
+            const existingRead = readArticles ? JSON.parse(readArticles) : [];
+            if (!existingRead.includes(testUrl)) {
+                existingRead.push(testUrl);
+                localStorage.setItem(READ_KEY, JSON.stringify(existingRead));
+            }
+            
+            // 保存後の状態確認
+            const savedData = localStorage.getItem(READ_KEY);
+            log('保存後: ' + savedData);
+            
+            // 検証
+            try {
+                const parsedData = JSON.parse(savedData);
+                if (Array.isArray(parsedData) && parsedData.includes(testUrl)) {
+                    log('✅ PASS: 既読状態が正常に保存された');
+                } else {
+                    log('❌ FAIL: 既読状態の保存に失敗');
+                }
+            } catch (e) {
+                log('❌ FAIL: JSON パースエラー - ' + e.message);
+            }
+        }
+        
+        // TC_READ_002: 既読記事のフィルタリング検証
+        function testReadFiltering() {
+            log('\\n=== TC_READ_002: 既読記事のフィルタリング検証 ===');
+            
+            // テストデータの準備
+            const testArticles = [
+                { title: 'Article 1', url: 'https://example.com/article1' },
+                { title: 'Article 2', url: 'https://example.com/article2' },
+                { title: 'Article 3', url: 'https://example.com/article3' }
+            ];
+            
+            // Article 2 を既読として設定
+            const readArticles = ['https://example.com/article2'];
+            localStorage.setItem(READ_KEY, JSON.stringify(readArticles));
+            
+            // フィルタリング処理のシミュレーション
+            const storedRead = JSON.parse(localStorage.getItem(READ_KEY) || '[]');
+            const unreadArticles = testArticles.filter(article => !storedRead.includes(article.url));
+            
+            log('全記事数: ' + testArticles.length);
+            log('既読記事数: ' + storedRead.length);
+            log('未読記事数: ' + unreadArticles.length);
+            
+            // 検証
+            if (unreadArticles.length === 2 && 
+                unreadArticles.some(a => a.url === 'https://example.com/article1') &&
+                unreadArticles.some(a => a.url === 'https://example.com/article3')) {
+                log('✅ PASS: 既読記事が正常にフィルタリングされた');
+            } else {
+                log('❌ FAIL: フィルタリングが正常に機能しない');
+            }
+        }
+        
+        // TC_READ_003: localStorage データの永続化検証
+        function testDataPersistence() {
+            log('\\n=== TC_READ_003: localStorage データの永続化検証 ===');
+            
+            // テストデータの設定
+            const testData = ['https://example.com/persistent-article'];
+            localStorage.setItem(READ_KEY, JSON.stringify(testData));
+            
+            // データの確認
+            const retrievedData = localStorage.getItem(READ_KEY);
+            
+            if (retrievedData) {
+                try {
+                    const parsedData = JSON.parse(retrievedData);
+                    if (JSON.stringify(parsedData) === JSON.stringify(testData)) {
+                        log('✅ PASS: データが永続化されている');
+                    } else {
+                        log('❌ FAIL: データの内容が異なる');
+                    }
+                } catch (e) {
+                    log('❌ FAIL: データの解析に失敗 - ' + e.message);
+                }
+            } else {
+                log('❌ FAIL: データが保存されていない');
+            }
+            
+            // ストレージの制限テスト
+            try {
+                const largeData = new Array(1000).fill('https://example.com/article-' + Math.random());
+                localStorage.setItem('testLargeData', JSON.stringify(largeData));
+                log('✅ PASS: 大量データの保存が可能');
+                localStorage.removeItem('testLargeData');
+            } catch (e) {
+                log('❌ FAIL: 大量データの保存でエラー - ' + e.message);
+            }
+        }
+        
+        // エラーケースのテスト
+        function testErrorCases() {
+            log('\\n=== エラーケースのテスト ===');
+            
+            // 無効なJSONデータのテスト
+            localStorage.setItem(READ_KEY, 'invalid json data');
+            try {
+                const data = localStorage.getItem(READ_KEY);
+                JSON.parse(data);
+                log('❌ FAIL: 無効JSONが正常に処理された');
+            } catch (e) {
+                log('✅ PASS: 無効JSONで適切にエラーが発生');
+            }
+            
+            // データのリセット
+            localStorage.removeItem(READ_KEY);
+        }
+        
+        // 全テストの実行
+        function runAllTests() {
+            log('既読管理機能のテストを開始します...');
+            testReadStatusSave();
+            testReadFiltering();
+            testDataPersistence();
+            testErrorCases();
+            log('\\n全テスト完了');
+        }
+        
+        // ページ読み込み時にテスト実行
+        runAllTests();
+    </script>
+</body>
+</html>
