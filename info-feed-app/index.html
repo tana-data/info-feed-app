@@ -773,8 +773,18 @@
       } catch (error) {
         console.error('YouTube summary error:', error);
         
+        // より詳細なエラーメッセージ
+        let errorMessage = error.message;
+        if (errorMessage.includes('HTTP 404')) {
+          errorMessage = '記事が見つかりません。ページを更新してお試しください。';
+        } else if (errorMessage.includes('HTTP 500')) {
+          errorMessage = 'サーバーエラーが発生しました。しばらくしてから再試行してください。';
+        } else if (errorMessage.includes('fetch')) {
+          errorMessage = 'ネットワークエラーが発生しました。接続を確認してください。';
+        }
+        
         // エラー表示
-        errorContainer.textContent = `エラー: ${error.message}`;
+        errorContainer.textContent = `エラー: ${errorMessage}`;
         errorContainer.style.display = 'block';
         progressContainer.style.display = 'none';
         
@@ -912,12 +922,24 @@
           const response = await fetch(`${API_BASE}/api/articles/${articleId}/summary`);
           const data = await response.json();
           
-          if ((data.request_status === 'completed' || data.summary_status === 'completed') && data.summary_text) {
+          console.log('YouTube summary check result:', data); // デバッグログ
+          
+          // 成功条件をより厳密にチェック
+          const isCompleted = data.summary_status === 'completed' || data.request_status === 'completed';
+          const hasSummaryText = data.summary_text && data.summary_text.trim().length > 0;
+          
+          if (isCompleted && hasSummaryText) {
             clearInterval(progressInterval);
             
             // 成功時のUI更新
             progressText.textContent = '要約完了！';
             progressFill.style.width = '100%';
+            
+            // エラーコンテナを非表示にする
+            const errorContainer = document.getElementById(`error-message-${articleId}`);
+            if (errorContainer) {
+              errorContainer.style.display = 'none';
+            }
             
             setTimeout(() => {
               document.getElementById(`progress-container-${articleId}`).style.display = 'none';
@@ -959,8 +981,13 @@
               button.disabled = false;
               button.textContent = '🎬 動画要約';
             }
-          } else {
+          } else if (data.summary_status === 'pending' || data.request_status === 'pending' || 
+                     data.summary_status === 'processing' || data.request_status === 'processing') {
             // まだ処理中 - 次回チェック
+            setTimeout(checkResult, 8000); // 8秒に短縮
+          } else {
+            // 予期しない状態
+            console.warn('Unexpected summary status:', data);
             setTimeout(checkResult, 10000);
           }
         } catch (error) {
