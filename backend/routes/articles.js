@@ -728,19 +728,31 @@ async function processManualSummaryRequest(articleId, manualText) {
 async function processYouTubeSummary(url) {
   const { getYouTubeContent, getTranscriptErrorMessage } = require('../utils/youtube-helper');
   
+  console.log(`🎬 Starting YouTube summary processing for: ${url}`);
+  
   try {
+    console.log('📡 Step 1: Getting YouTube content...');
     const result = await getYouTubeContent(url);
     
+    console.log(`✅ Content extraction successful:`, {
+      method: result.method,
+      content_length: result.length,
+      methods_attempted: result.methods || 'unknown'
+    });
+    
     if (!result.content || result.content.trim().length === 0) {
+      console.error('❌ No content extracted despite successful getYouTubeContent call');
       throw new Error('No content was extracted from the video');
     }
     
-    console.log(`Processing YouTube summary via ${result.method}, content length: ${result.length} characters`);
+    console.log(`📝 Step 2: Generating summary via ${result.method}, content length: ${result.length} characters`);
     
     // メソッド情報を追加してサマリーを生成（詳細要約）
     const summary = await generateSummary(result.content, { detailed: true });
-    let methodInfo;
     
+    console.log(`✅ Summary generation successful: ${summary.length} characters`);
+    
+    let methodInfo;
     switch (result.method) {
       case 'transcript':
         methodInfo = '（字幕から要約）';
@@ -755,19 +767,29 @@ async function processYouTubeSummary(url) {
         methodInfo = '（要約）';
     }
     
-    return `${summary}\n\n${methodInfo}`;
+    const finalSummary = `${summary}\n\n${methodInfo}`;
+    console.log(`🎯 YouTube summary processing completed successfully`);
+    
+    return finalSummary;
   } catch (error) {
-    console.error('YouTube summary processing failed:', error.message);
+    console.error('❌ YouTube summary processing failed:', {
+      error_message: error.message,
+      error_stack: error.stack,
+      url: url
+    });
     
     // 音声処理が成功している場合は、その旨をエラーメッセージに含める
     if (error.message.includes('Audio transcription completed') || 
         error.message.includes('音声から文字起こし') ||
         error.message.includes('✅ Content extracted via: audio')) {
-      // 音声処理は成功したが他の部分で失敗した場合
+      console.log('🔧 Audio processing succeeded but other part failed');
       throw new Error('音声処理は成功しましたが、要約生成中にエラーが発生しました。再度お試しください。');
     }
     
+    console.log('🔍 Converting to user-friendly error message...');
     const userFriendlyMessage = getTranscriptErrorMessage(error);
+    console.log(`📨 Final error message: ${userFriendlyMessage}`);
+    
     throw new Error(userFriendlyMessage);
   }
 }

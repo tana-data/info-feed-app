@@ -384,7 +384,7 @@
   </style>
 </head>
 <body>
-  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.3</small></h1>
+  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.4</small></h1>
   
   <div class="tabs">
     <button class="tab active" onclick="switchTab('articles')">記事一覧</button>
@@ -922,7 +922,15 @@
           const response = await fetch(`${API_BASE}/api/articles/${articleId}/summary`);
           const data = await response.json();
           
-          console.log('YouTube summary check result:', data); // デバッグログ
+          console.log('🔍 YouTube summary check result:', data); // デバッグログ
+          console.log('🔍 Detailed status check:', {
+            summary_status: data.summary_status,
+            request_status: data.request_status,
+            has_summary_text: !!data.summary_text,
+            summary_text_length: data.summary_text ? data.summary_text.length : 0,
+            error_message: data.error_message,
+            timestamp: new Date().toISOString()
+          });
           
           // 成功条件をより厳密にチェック
           const isCompleted = data.summary_status === 'completed' || data.request_status === 'completed';
@@ -966,6 +974,13 @@
             
           } else if (data.request_status === 'failed' || data.summary_status === 'failed') {
             clearInterval(progressInterval);
+            
+            console.log('❌ YouTube summary failed:', {
+              request_status: data.request_status,
+              summary_status: data.summary_status,
+              error_message: data.error_message,
+              methods_attempted: data.methods || 'unknown'
+            });
             
             // エラー表示
             const errorContainer = document.getElementById(`error-message-${articleId}`);
