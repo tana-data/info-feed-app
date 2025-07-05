@@ -72,13 +72,13 @@ async function getYouTubeTranscript(url) {
       }
     }
     
-    // 方法1: 正規化されたURLで直接取得（英語で試行）
+    // 方法1: 正規化されたURLで直接取得（言語指定なし）
     try {
-      const transcript = await YoutubeTranscript.fetchTranscript(normalizedUrl, { lang: 'en' });
+      const transcript = await YoutubeTranscript.fetchTranscript(normalizedUrl);
       const text = transcript.map(item => item.text).join(' ');
       
       if (text && text.trim().length > 0) {
-        console.log(`Transcript length: ${text.length} characters (method 1, lang: en)`);
+        console.log(`Transcript length: ${text.length} characters (method 1, auto-detected)`);
         // キャッシュに保存
         if (videoId) {
           await cacheTranscript(videoId, text);
@@ -90,14 +90,14 @@ async function getYouTubeTranscript(url) {
       console.log(`Transcript method 1 failed: ${error.message}`);
     }
     
-    // 方法2: 動画IDで直接取得（英語で試行）
+    // 方法2: 動画IDで直接取得（言語指定なし）
     if (videoId) {
       try {
-        const transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: 'en' });
+        const transcript = await YoutubeTranscript.fetchTranscript(videoId);
         const text = transcript.map(item => item.text).join(' ');
         
         if (text && text.trim().length > 0) {
-          console.log(`Transcript length: ${text.length} characters (method 2, lang: en)`);
+          console.log(`Transcript length: ${text.length} characters (method 2, auto-detected)`);
           // キャッシュに保存
           await cacheTranscript(videoId, text);
           return text;
@@ -108,8 +108,8 @@ async function getYouTubeTranscript(url) {
       }
     }
     
-    // 方法3: 異なる言語で試行（エラーログから利用可能な'en'を優先）
-    const languages = ['en', 'ja', 'en-US'];
+    // 方法3: 異なる言語で試行（利用可能な言語を優先）
+    const languages = ['en', 'ja', 'en-US', 'en-GB', 'auto'];
     for (const lang of languages) {
       try {
         const transcript = await YoutubeTranscript.fetchTranscript(normalizedUrl, {
@@ -129,6 +129,25 @@ async function getYouTubeTranscript(url) {
         errors.push(`Language ${lang} failed: ${error.message}`);
         console.log(`Transcript method 3 (${lang}) failed: ${error.message}`);
       }
+    }
+    
+    // 方法4: 利用可能な言語を自動検出して取得
+    try {
+      console.log('Trying to fetch transcript without language specification...');
+      const transcript = await YoutubeTranscript.fetchTranscript(normalizedUrl);
+      const text = transcript.map(item => item.text).join(' ');
+      
+      if (text && text.trim().length > 0) {
+        console.log(`Transcript found (auto-detected), length: ${text.length} characters`);
+        // キャッシュに保存
+        if (videoId) {
+          await cacheTranscript(videoId, text);
+        }
+        return text;
+      }
+    } catch (error) {
+      errors.push(`Auto-detection failed: ${error.message}`);
+      console.log(`Transcript method 4 (auto) failed: ${error.message}`);
     }
     
     throw new Error(`No transcript available. Tried multiple methods: ${errors.join('; ')}`);
@@ -185,6 +204,10 @@ function getTranscriptErrorMessage(error) {
   
   if (message.includes('字幕、説明文、音声のいずれからも')) {
     return 'YouTubeから自動でコンテンツを取得できませんでした。\n\n解決方法:\n1. 「手動要約」ボタンをクリック\n2. 動画の内容や要点を手入力\n3. AI要約を実行\n\n※現在、多くの動画では説明文からの自動要約が利用可能です';
+  }
+  
+  if (message.includes('audio transcription completed')) {
+    return '音声からの要約が完了しました。';
   }
   
   if (message.includes('impossible to retrieve') || message.includes('video id')) {

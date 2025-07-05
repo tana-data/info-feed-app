@@ -758,6 +758,15 @@ async function processYouTubeSummary(url) {
     return `${summary}\n\n${methodInfo}`;
   } catch (error) {
     console.error('YouTube summary processing failed:', error.message);
+    
+    // 音声処理が成功している場合は、その旨をエラーメッセージに含める
+    if (error.message.includes('Audio transcription completed') || 
+        error.message.includes('音声から文字起こし') ||
+        error.message.includes('✅ Content extracted via: audio')) {
+      // 音声処理は成功したが他の部分で失敗した場合
+      throw new Error('音声処理は成功しましたが、要約生成中にエラーが発生しました。再度お試しください。');
+    }
+    
     const userFriendlyMessage = getTranscriptErrorMessage(error);
     throw new Error(userFriendlyMessage);
   }
