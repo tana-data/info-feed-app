@@ -1,132 +1,108 @@
-# 📱 RSS Feed 情報収集ツール
+# 情報収集ツール
 
-> **🌐 GitHub Pages デモ**: [https://tana-data.github.io/info-feed-app/](https://tana-data.github.io/info-feed-app/)
+RSS Feed管理とYouTube/Podcast AI要約機能を持つPWA（Progressive Web App）対応の情報収集ツール
 
-RSS Feed管理とYouTube/Podcast要約機能を持つ情報収集ツールです。
+## 🚀 本番環境
 
-![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen?style=flat-square&logo=github)
-![Node.js](https://img.shields.io/badge/Node.js-v14+-green?style=flat-square&logo=node.js)
-![AI Powered](https://img.shields.io/badge/AI-Powered-blue?style=flat-square)
+**Railway URL**: https://info-feed-app-production.up.railway.app
 
-## ✨ 機能
+### 📱 スマホアプリとして利用
+1. 上記URLにスマホでアクセス
+2. 「ホーム画面に追加」でアプリ化
+3. アイコンタップでアプリライクに起動
 
-### 🎯 コア機能
-- **RSS Feed 管理**: URL登録・削除、自動記事収集
-- **記事カテゴリ分類**: YouTube/Podcast/Web記事の自動識別
-- **AI要約機能**: YouTube動画音声→文字起こし→要約
-- **手動要約**: 任意テキストのAI要約
-- **スケジューラー**: 日次・週次の自動更新
+## ✨ 主要機能
 
-### 🚀 YouTube音声処理 (2025-06-30 大幅改良)
-- **高精度音声処理**: 説明文ベース → 実際の音声コンテンツベース
-- **4段階フォールバック**: ytdl-core → yt-dlp → pytube → youtube-dl
-- **OpenAI Whisper API**: 音声文字起こし
-- **WSL2最適化**: Windows環境での安定動作
+- 📰 **RSS Feed登録・管理** - Webサイト、YouTube、Podcast対応
+- 🤖 **AI要約機能** - YouTube動画・Podcast音声・テキストの自動要約
+- 📱 **PWAアプリ対応** - スマホホーム画面に追加可能
+- 🗄️ **データ永続化** - PostgreSQL使用（Railway）
+- ⏰ **自動更新** - 日次・週次スケジューラー
+- 👁️ **既読管理** - 読了記事の整理機能
 
-## 🌐 デモ
+## 🏗️ 技術スタック
 
-### GitHub Pages版 (静的表示)
-**URL**: [https://tana-data.github.io/info-feed-app/](https://tana-data.github.io/info-feed-app/)
+- **Backend**: Node.js + Express.js
+- **Database**: SQLite (dev) / PostgreSQL (prod)
+- **Frontend**: Vanilla JavaScript PWA
+- **AI**: Google Gemini / OpenAI (GPT + Whisper)
+- **Audio**: @distube/ytdl-core + Whisper API
+- **Deploy**: Railway + GitHub Actions
 
-- ✅ フロントエンドUI表示
-- ✅ デザイン・レイアウト確認
-- ⚠️ バックエンド機能は制限あり
+## 📚 ドキュメント
 
-### 完全版 (ローカル実行)
-全機能（RSS取得、AI要約等）を使用するにはローカルでサーバーを起動してください。
+- 📖 **[プロジェクト概要](./PROJECT_OVERVIEW.md)** - 全体概要と機能詳細
+- 🔧 **[技術仕様書](./TECHNICAL_SPECIFICATION.md)** - アーキテクチャと実装詳細
+- 🚀 **[デプロイメントガイド](./DEPLOYMENT_GUIDE.md)** - Railway環境構築手順
+- 📱 **[使用方法ガイド](./USER_GUIDE.md)** - エンドユーザー向け操作説明
+- 📝 **[CLAUDE.md](./CLAUDE.md)** - 開発者向け詳細仕様
 
-## 🛠️ セットアップ
+## ⚡ クイックスタート
 
-### 必要な環境
-- Node.js (v14以上)
-- SQLite3
-- OpenAI API Key または Google Gemini API Key
-
-### インストール
-
+### ローカル開発環境
 ```bash
-# リポジトリをクローン
+# リポジトリクローン
 git clone https://github.com/tana-data/info-feed-app.git
 cd info-feed-app
 
-# 依存関係をインストール
+# 依存関係インストール
 npm install
 
-# 環境変数を設定
+# 環境変数設定
 cp .env.example .env
-# .envファイルを編集してAPIキーを設定
+# .env を編集してAPI KEYを設定
 
-# サーバーを起動
-npm start
+# 開発サーバー起動
+npm run dev
+# → http://localhost:3000
 ```
 
-### 環境変数設定
+### 必要な環境変数
+```bash
+# AI Provider (推奨: Gemini)
+AI_PROVIDER=gemini
+GEMINI_API_KEY=your_gemini_api_key
+
+# Database (ローカル: SQLite)
+DATABASE_TYPE=sqlite
+DATABASE_PATH=./newsfeeder.db
+```
+
+## 🎯 主な使用フロー
+
+1. **RSS Feed登録**: 興味のあるサイト・YouTubeチャンネル・Podcastを追加
+2. **自動記事収集**: スケジューラーが新着記事を定期取得
+3. **AI要約**: YouTube動画・Podcast・記事の要約をワンクリック生成
+4. **スマホアプリ**: PWA機能でネイティブアプリライクに利用
+
+## 🛠️ 開発コマンド
 
 ```bash
-# .env ファイル
-PORT=3000
-OPENAI_API_KEY=your_openai_api_key_here
-GEMINI_API_KEY=your_gemini_api_key_here
-AI_PROVIDER=gemini
-DATABASE_PATH=./newsfeeder.db
-RSS_SCHEDULE=daily
+npm start          # 本番サーバー起動
+npm run dev        # 開発サーバー起動（nodemon）
+npm test           # テスト実行（未実装）
 ```
 
-## 📖 使用方法
+## 📊 バージョン情報
 
-1. **ローカル起動**: `http://localhost:3000` にアクセス
-2. **Feed管理**: RSS/YouTube Channel URLを登録
-3. **記事確認**: 自動収集された記事を閲覧
-4. **AI要約**: YouTube動画の「🎧 音声要約」をクリック
+- **Ver.0.4** (最新) - PostgreSQL対応、PWA機能、タイムアウト修正
+- **Ver.0.3** - YouTube音声処理改善、Whisper API統合
+- **Ver.0.2** - AI要約機能実装
+- **Ver.0.1** - RSS Feed基本機能
 
-## 🔧 技術スタック
+詳細な変更履歴は [CLAUDE.md](./CLAUDE.md) を参照してください。
 
-### Backend
-- **Runtime**: Node.js + Express.js
-- **Database**: SQLite3
-- **RSS**: rss-parser
-- **Scheduling**: node-cron
+## 🌐 GitHub Pages版（静的デモ）
 
-### AI & Audio Processing
-- **音声処理**: @distube/ytdl-core (YouTube), fluent-ffmpeg
-- **文字起こし**: OpenAI Whisper API
-- **要約AI**: OpenAI GPT / Google Gemini API
-- **字幕**: youtube-transcript
-
-### Frontend
-- **UI**: Vanilla JavaScript, HTML5, CSS3
-- **PWA**: Service Worker, Web App Manifest
-- **Design**: レスポンシブデザイン
-
-## 📁 プロジェクト構造
-
-```
-├── backend/
-│   ├── models/database.js          # SQLite DB設定
-│   ├── routes/                     # API エンドポイント
-│   └── utils/
-│       ├── youtube-helper.js       # YouTube処理統合
-│       ├── youtube-audio-helper.js # 音声ダウンロード・転写
-│       └── whisper-service.js      # OpenAI Whisper統合
-├── info-feed-app/                  # フロントエンド
-│   ├── index.html                  # メインUI
-│   ├── manifest.json               # PWA設定
-│   └── sw.js                       # Service Worker
-├── server.js                       # メインサーバー
-└── package.json                    # 依存関係
-```
-
-## 📋 変更履歴
-
-### 🎙️ 2025-06-30: YouTube音声処理大幅改良
-- **精度向上**: 説明文 → 実際の音声コンテンツ処理
-- **信頼性向上**: @distube/ytdl-core移行、4段階フォールバック
-- **パフォーマンス**: WSL2最適化、Whisper API統合
-
-## 📄 ライセンス
-
-MIT License
+**URL**: https://tana-data.github.io/info-feed-app/
+- ✅ フロントエンドUI確認用
+- ⚠️ バックエンド機能は制限あり（完全版はRailway URLを利用）
 
 ---
 
-**🚀 開発**: Claude Code による音声処理システム改良 (2025-06-30)
+![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live%20Demo-brightgreen?style=flat-square&logo=github)
+![Node.js](https://img.shields.io/badge/Node.js-v22+-green?style=flat-square&logo=node.js)
+![AI Powered](https://img.shields.io/badge/AI-Powered-blue?style=flat-square)
+![PWA Ready](https://img.shields.io/badge/PWA-Ready-purple?style=flat-square)
+
+**📄 ライセンス**: MIT License
