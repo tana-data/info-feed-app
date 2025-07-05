@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>情報収集ツール</title>
+  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.4</span></title>
   <link rel="manifest" href="manifest.json">
   <style>
     body {
@@ -900,6 +900,8 @@
       ];
       
       let currentStage = 0;
+      const startTime = Date.now();
+      const MAX_TIMEOUT = 10 * 60 * 1000; // 10分タイムアウト
       
       const updateProgress = () => {
         if (currentStage < stages.length) {
@@ -919,6 +921,29 @@
       // 結果をポーリング
       const checkResult = async () => {
         try {
+          // タイムアウトチェック
+          const elapsed = Date.now() - startTime;
+          if (elapsed > MAX_TIMEOUT) {
+            clearInterval(progressInterval);
+            
+            console.log('⏰ YouTube summary timed out after', elapsed/1000, 'seconds');
+            
+            // タイムアウト時のUI更新
+            const errorContainer = document.getElementById(`error-message-${articleId}`);
+            if (errorContainer) {
+              errorContainer.textContent = 'タイムアウト: 処理時間が長すぎます。「手動要約」をお試しください。';
+              errorContainer.style.display = 'block';
+            }
+            
+            document.getElementById(`progress-container-${articleId}`).style.display = 'none';
+            
+            if (button) {
+              button.disabled = false;
+              button.textContent = '🎬 動画要約';
+            }
+            return;
+          }
+          
           const response = await fetch(`${API_BASE}/api/articles/${articleId}/summary`);
           const data = await response.json();
           
@@ -929,7 +954,8 @@
             has_summary_text: !!data.summary_text,
             summary_text_length: data.summary_text ? data.summary_text.length : 0,
             error_message: data.error_message,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            elapsed_seconds: elapsed/1000
           });
           
           // 成功条件をより厳密にチェック
