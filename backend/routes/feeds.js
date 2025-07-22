@@ -3,7 +3,14 @@ const router = express.Router();
 const db = require('../models/database');
 const Parser = require('rss-parser');
 const { updateProductHuntApps } = require('../utils/scheduler');
-const parser = new Parser();
+
+// RSS パーサーにタイムアウト設定を追加（20秒）
+const parser = new Parser({
+  timeout: 20000,
+  headers: {
+    'User-Agent': 'RSS Feed News Tool/1.0'
+  }
+});
 
 router.get('/', (req, res) => {
   db.all('SELECT * FROM feeds WHERE is_active = 1 ORDER BY created_at DESC', (err, rows) => {

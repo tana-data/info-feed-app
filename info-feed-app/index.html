@@ -1517,10 +1517,18 @@
         return;
       }
       
-      const addButton = document.querySelector('.feed-form button');
+      // より具体的なセレクターを使用してエラーを回避
+      const addButton = document.querySelector('.feed-form button[onclick="addFeed()"]') || 
+                       document.querySelector('.feed-form button');
       const originalText = addButton.textContent;
       
       console.log('🚀 Starting feed addition:', url);
+      console.log('🔧 Button found:', !!addButton);
+      
+      if (!addButton) {
+        alert('エラー: 追加ボタンが見つかりません。ページを再読み込みしてください。');
+        return;
+      }
       
       try {
         // UIを更新してユーザーに処理中を示す
@@ -1528,6 +1536,8 @@
         addButton.textContent = '処理中...';
         
         console.log('📡 Sending POST request to /api/feeds');
+        console.log('📡 API_BASE:', API_BASE);
+        console.log('📡 Full URL:', `${API_BASE}/api/feeds`);
         
         // タイムアウトを設定（30秒）
         const controller = new AbortController();
@@ -1595,10 +1605,13 @@
           networkErrorMessage += '原因: サーバーに接続できません\n';
           networkErrorMessage += '対処: ネットワーク接続を確認してください';
         } else if (error.name === 'AbortError') {
-          networkErrorMessage += '原因: リクエストがタイムアウトしました\n';
-          networkErrorMessage += '対処: しばらく待ってから再試行してください';
+          networkErrorMessage += '原因: リクエストがタイムアウトしました（30秒）\n';
+          networkErrorMessage += '対処: RSS フィードの処理に時間がかかっています。\n';
+          networkErrorMessage += 'しばらく待ってから再試行するか、別のフィードをお試しください';
         } else {
           networkErrorMessage += `詳細: ${error.message}\n`;
+          networkErrorMessage += `エラータイプ: ${error.name}\n`;
+          networkErrorMessage += `URL: ${url}\n`;
           networkErrorMessage += 'ページを更新して再試行してください';
         }
         
