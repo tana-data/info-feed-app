@@ -59,61 +59,50 @@ router.post('/', async (req, res) => {
       description: feed.description?.substring(0, 100)
     });
     
-    // 既存のFeed（削除済み含む）をチェック
-    db.get('SELECT id, is_active FROM feeds WHERE url = ?', [url], (err, existingFeed) => {
-      if (err) {
-        console.error(`❌ [${requestId}] Database error during feed check:`, err);
-        return res.status(500).json({ error: err.message });
-      }
+    // 既存のFeed（削除済み含む）をチェック  
+    console.log(`🔍 [${requestId}] Starting database feed existence check`);
+    const dbStartTime = Date.now();
+    
+    const existingFeed = await db.get('SELECT id, is_active FROM feeds WHERE url = ?', [url]);
+    const dbQueryTime = Date.now() - dbStartTime;
+    console.log(`📊 [${requestId}] Database query completed in ${dbQueryTime}ms`);
+    
+    console.log(`🔍 [${requestId}] Feed check result: ${existingFeed ? 'EXISTS' : 'NEW'} (${existingFeed?.is_active === 1 ? 'ACTIVE' : 'INACTIVE'})`);
       
-      console.log(`🔍 [${requestId}] Feed existence check result:`, {
-        url: url,
-        existingFeed: existingFeed,
-        isActive: existingFeed?.is_active
-      });
-      
-      if (existingFeed) {
-        if (existingFeed.is_active === 1) {
-          console.log(`ℹ️ [${requestId}] Feed already active: ID=${existingFeed.id}`);
-          return res.status(409).json({ error: 'Feed already exists' });
-        } else {
-          console.log(`🔄 [${requestId}] Reactivating deleted feed: ID=${existingFeed.id}`);
-          // 削除済みFeedを再アクティブ化
-          db.run(
-            'UPDATE feeds SET is_active = 1, title = ?, description = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
-            [feed.title || '', feed.description || '', existingFeed.id],
-            function(err) {
-              if (err) {
-                console.error(`❌ [${requestId}] Error reactivating feed:`, err);
-                return res.status(500).json({ error: err.message });
-              }
-              
-              console.log(`✅ [${requestId}] Feed reactivated, processing initial articles`);
-              // 最新5記事を取得して追加 (既に解析済みのfeedデータを渡す)
-              processNewFeedArticles(existingFeed.id, url, feed.title || '', res, requestId, feed);
-            }
-          );
-        }
+    if (existingFeed) {
+      if (existingFeed.is_active === 1) {
+        console.log(`ℹ️ [${requestId}] Feed already active: ID=${existingFeed.id}`);
+        return res.status(409).json({ error: 'Feed already exists' });
       } else {
-        console.log(`➕ [${requestId}] Adding new feed to database`);
-        // 新規Feed追加
-        db.run(
-          'INSERT INTO feeds (url, title, description, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
-          [url, feed.title || '', feed.description || ''],
-          function(err) {
-            if (err) {
-              console.error(`❌ [${requestId}] Error inserting new feed:`, err);
-              return res.status(500).json({ error: err.message });
-            }
-            
-            const feedId = this.lastID;
-            console.log(`✅ [${requestId}] New feed inserted with ID: ${feedId}, processing initial articles`);
-            // 最新5記事を取得して追加 (既に解析済みのfeedデータを渡す)
-            processNewFeedArticles(feedId, url, feed.title || '', res, requestId, feed);
-          }
+        console.log(`🔄 [${requestId}] Reactivating deleted feed: ID=${existingFeed.id}`);
+        // 削除済みFeedを再アクティブ化
+        await db.run(
+          'UPDATE feeds SET is_active = 1, title = ?, description = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
+          [feed.title || '', feed.description || '', existingFeed.id]
         );
+        
+        console.log(`✅ [${requestId}] Feed reactivated, processing initial articles`);
+        // 最新5記事を取得して追加 (既に解析済みのfeedデータを渡す)
+        return processNewFeedArticles(existingFeed.id, url, feed.title || '', res, requestId, feed);
       }
-    });
+    } else {
+      console.log(`➕ [${requestId}] Adding new feed to database`);
+      const insertStartTime = Date.now();
+      
+      // 新規Feed追加
+      const result = await db.run(
+        'INSERT INTO feeds (url, title, description, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+        [url, feed.title || '', feed.description || '']
+      );
+      
+      const insertTime = Date.now() - insertStartTime;
+      console.log(`📊 [${requestId}] Feed insert completed in ${insertTime}ms`);
+      
+      const feedId = result.lastID;
+      console.log(`✅ [${requestId}] New feed inserted with ID: ${feedId}, starting article processing`);
+      // 最新5記事を取得して追加 (既に解析済みのfeedデータを渡す)
+      return processNewFeedArticles(feedId, url, feed.title || '', res, requestId, feed);
+    }
   } catch (error) {
     console.error(`❌ [${requestId}] RSS parsing failed:`, {
       url: url,
@@ -314,43 +303,33 @@ async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId
     let newArticlesCount = 0;
     let errorCount = 0;
     
-    // SQLite は同期処理が安全。シンプルな順次処理に戻す
+    // Promise-based database operations for consistency
     for (const item of sortedItems) {
       const guid = item.guid || item.link;
       const contentType = detectContentType(item.link);
       
       try {
-        await new Promise((resolve, reject) => {
-          db.run(
-            `INSERT INTO articles 
-             (feed_id, guid, title, link, description, pub_date, content_type) 
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [
-              feedId,
-              guid,
-              item.title || '',
-              item.link || '',
-              item.contentSnippet || item.content || '',
-              item.pubDate || item.isoDate || new Date().toISOString(),
-              contentType
-            ],
-            function(err) {
-              if (err) {
-                if (err.code === 'SQLITE_CONSTRAINT' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-                  // 重複は正常として扱う
-                } else {
-                  errorCount++;
-                }
-                resolve();
-              } else {
-                newArticlesCount++;
-                resolve();
-              }
-            }
-          );
-        });
+        await db.run(
+          `INSERT INTO articles 
+           (feed_id, guid, title, link, description, pub_date, content_type) 
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            feedId,
+            guid,
+            item.title || '',
+            item.link || '',
+            item.contentSnippet || item.content || '',
+            item.pubDate || item.isoDate || new Date().toISOString(),
+            contentType
+          ]
+        );
+        newArticlesCount++;
       } catch (error) {
-        errorCount++;
+        if (error.code === 'SQLITE_CONSTRAINT' || error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+          // 重複は正常として扱う（カウントに含めない）
+        } else {
+          errorCount++;
+        }
       }
     }
     
