@@ -89,8 +89,8 @@ router.post('/', async (req, res) => {
               }
               
               console.log(`✅ [${requestId}] Feed reactivated, processing initial articles`);
-              // 最新5記事を取得して追加
-              processNewFeedArticles(existingFeed.id, url, feed.title || '', res, requestId);
+              // 最新5記事を取得して追加 (既に解析済みのfeedデータを渡す)
+              processNewFeedArticles(existingFeed.id, url, feed.title || '', res, requestId, feed);
             }
           );
         }
@@ -108,8 +108,8 @@ router.post('/', async (req, res) => {
             
             const feedId = this.lastID;
             console.log(`✅ [${requestId}] New feed inserted with ID: ${feedId}, processing initial articles`);
-            // 最新5記事を取得して追加
-            processNewFeedArticles(feedId, url, feed.title || '', res, requestId);
+            // 最新5記事を取得して追加 (既に解析済みのfeedデータを渡す)
+            processNewFeedArticles(feedId, url, feed.title || '', res, requestId, feed);
           }
         );
       }
@@ -295,41 +295,29 @@ router.post('/refresh-producthunt', async (req, res) => {
 });
 
 // 新規Feed追加時の記事処理（最新5件のみ）
-async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId) {
+async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId, parsedFeed) {
   const startTime = Date.now();
   console.log(`🔄 [${requestId}] Starting article processing for feed: ${feedTitle} (ID: ${feedId})`);
   
   try {
-    console.log(`📡 [${requestId}] Re-parsing RSS feed for article extraction: ${feedUrl}`);
-    const parsedFeed = await parser.parseURL(feedUrl);
-    const parseTime = Date.now() - startTime;
+    // 二重RSS解析を除去: 既に解析済みのfeedデータを使用
+    console.log(`📡 [${requestId}] Using pre-parsed RSS feed data (avoiding duplicate parsing)`);
+    const parseTime = 0; // 解析時間はメイン処理で計測済み
     
     // 最新5件のみに制限し、日付順でソート
     const sortedItems = parsedFeed.items
       .sort((a, b) => new Date(b.pubDate || b.isoDate || 0) - new Date(a.pubDate || a.isoDate || 0))
       .slice(0, 5);
 
-    console.log(`📊 [${requestId}] Article processing details:`, {
-      feedTitle: feedTitle,
-      totalRssItems: parsedFeed.items.length,
-      itemsToProcess: sortedItems.length,
-      parseTime: `${parseTime}ms`
-    });
+    console.log(`📊 [${requestId}] Processing ${sortedItems.length}/${parsedFeed.items.length} articles`);
     
     let newArticlesCount = 0;
     let errorCount = 0;
     
-    for (let i = 0; i < sortedItems.length; i++) {
-      const item = sortedItems[i];
+    // SQLite は同期処理が安全。シンプルな順次処理に戻す
+    for (const item of sortedItems) {
       const guid = item.guid || item.link;
       const contentType = detectContentType(item.link);
-      
-      console.log(`📝 [${requestId}] Processing article ${i + 1}/${sortedItems.length}:`, {
-        title: item.title?.substring(0, 50) + '...',
-        guid: guid?.substring(0, 50) + '...',
-        contentType: contentType,
-        pubDate: item.pubDate || item.isoDate
-      });
       
       try {
         await new Promise((resolve, reject) => {
@@ -349,34 +337,25 @@ async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId
             function(err) {
               if (err) {
                 if (err.code === 'SQLITE_CONSTRAINT' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
-                  console.log(`ℹ️ [${requestId}] Article already exists (duplicate GUID): ${guid?.substring(0, 30)}...`);
+                  // 重複は正常として扱う
                 } else {
-                  console.error(`❌ [${requestId}] Article insert error:`, err);
                   errorCount++;
                 }
-                resolve(); // 重複エラーは正常として扱う
+                resolve();
               } else {
                 newArticlesCount++;
-                console.log(`✅ [${requestId}] Article added successfully: ${item.title?.substring(0, 30)}...`);
                 resolve();
               }
             }
           );
         });
       } catch (error) {
-        console.error(`❌ [${requestId}] Error inserting article:`, error);
         errorCount++;
       }
     }
     
     const totalTime = Date.now() - startTime;
-    console.log(`✅ [${requestId}] Article processing completed:`, {
-      feedTitle: feedTitle,
-      newArticlesAdded: newArticlesCount,
-      duplicatesSkipped: sortedItems.length - newArticlesCount - errorCount,
-      errors: errorCount,
-      totalProcessingTime: `${totalTime}ms`
-    });
+    console.log(`✅ [${requestId}] Completed: ${newArticlesCount} new, ${sortedItems.length - newArticlesCount - errorCount} duplicates, ${errorCount} errors (${totalTime}ms)`);
     
     res.status(201).json({
       id: feedId,
@@ -390,11 +369,7 @@ async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId
     
   } catch (error) {
     const totalTime = Date.now() - startTime;
-    console.error(`❌ [${requestId}] Error processing new feed articles:`, {
-      error: error.message,
-      feedUrl: feedUrl,
-      processingTime: `${totalTime}ms`
-    });
+    console.error(`❌ [${requestId}] Feed processing error: ${error.message} (${totalTime}ms)`);
     
     res.status(201).json({
       id: feedId,
