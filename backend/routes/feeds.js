@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../models/database');
 const Parser = require('rss-parser');
+const { updateProductHuntApps } = require('../utils/scheduler');
 const parser = new Parser();
 
 router.get('/', (req, res) => {
@@ -205,6 +206,32 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+// Product Hunt手動更新エンドポイント
+router.post('/refresh-producthunt', async (req, res) => {
+  try {
+    console.log('Manual Product Hunt refresh requested');
+    const result = await updateProductHuntApps();
+    
+    if (result.success) {
+      res.json({
+        message: `Product Hunt update completed: ${result.newApps} new apps added`,
+        newApps: result.newApps
+      });
+    } else {
+      res.status(500).json({
+        error: result.error || 'Product Hunt update failed',
+        message: 'Failed to update Product Hunt apps'
+      });
+    }
+  } catch (error) {
+    console.error('Product Hunt manual refresh error:', error);
+    res.status(500).json({
+      error: error.message || 'Product Hunt update failed',
+      message: 'Failed to update Product Hunt apps'
+    });
+  }
+});
+
 // 新規Feed追加時の記事処理（最新5件のみ）
 async function processNewFeedArticles(feedId, feedUrl, feedTitle, res) {
   try {
@@ -287,6 +314,10 @@ function detectContentType(url) {
   
   if (url.includes('podcast') || url.includes('anchor.fm') || url.includes('spotify.com')) {
     return 'podcast';
+  }
+  
+  if (url.includes('producthunt.com') || url.includes('Product Hunt')) {
+    return 'producthunt';
   }
   
   return 'article';

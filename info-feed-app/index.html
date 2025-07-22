@@ -200,6 +200,12 @@
       color: white;
       border-color: #007cba;
     }
+
+    .producthunt-summary-button {
+      background-color: #da552f;
+      color: white;
+      border-color: #da552f;
+    }
     
     .summary-button:disabled {
       background-color: #6c757d;
@@ -409,6 +415,9 @@
   <div id="articles-tab" class="tab-content active">
     <div class="controls">
       <button onclick="refreshArticles()">記事を更新</button>
+      <button onclick="refreshProductHunt()" style="background-color: #da552f;">
+        🚀 Product Hunt更新
+      </button>
       <label>
         <input type="checkbox" id="unread-only" checked onchange="loadArticles(false)">
         未読のみ表示
@@ -526,6 +535,7 @@
         const typeLabels = {
           'youtube': 'YouTube動画',
           'podcast': 'Podcast',
+          'producthunt': 'Product Hunt',
           'article': 'Web記事'
         };
         
@@ -636,6 +646,16 @@
                      ${article.summary_status === 'processing' ? 'disabled' : ''}>
               🎧 音声要約
             </button>` : ''}
+          ${article.content_type === 'producthunt' ? 
+            `<button class="producthunt-summary-button" id="producthunt-summary-btn-${article.id}" onclick="requestManualSummary(${article.id})" 
+                     ${article.summary_status === 'processing' ? 'disabled' : ''}>
+              🚀 アプリ要約
+            </button>
+            <a href="${article.link}" target="_blank" class="producthunt-link" style="text-decoration: none;">
+              <button style="background-color: #da552f; color: white; margin-left: 0.5rem;">
+                🔗 Product Hunt
+              </button>
+            </a>` : ''}
           <button class="manual-summary-button" onclick="showManualSummaryModal(${article.id})">
             ✏️ 手動要約
           </button>
@@ -1405,6 +1425,47 @@
         }
       } catch (error) {
         console.error('Error refreshing articles:', error);
+      }
+    }
+
+    // Product Hunt更新
+    async function refreshProductHunt() {
+      try {
+        const button = event.target;
+        button.disabled = true;
+        button.textContent = '🔄 更新中...';
+        
+        const response = await fetch(`${API_BASE}/api/feeds/refresh-producthunt`, {
+          method: 'POST'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          alert(`Product Hunt更新完了: ${data.newApps} 個の新しいアプリを追加しました`);
+          
+          // 記事一覧をクリアしてから新しい記事のみを読み込み
+          const container = document.getElementById('articles-container');
+          container.innerHTML = '';
+          currentOffset = 0;
+          
+          // 未読記事のみを表示するためにチェックボックスをONにする
+          const unreadOnlyCheckbox = document.getElementById('unread-only');
+          if (unreadOnlyCheckbox) {
+            unreadOnlyCheckbox.checked = true;
+          }
+          
+          loadArticles();
+        } else {
+          const errorData = await response.json();
+          alert(`Product Hunt更新に失敗しました: ${errorData.error || errorData.message || 'Unknown error'}`);
+        }
+      } catch (error) {
+        console.error('Error refreshing Product Hunt:', error);
+        alert('Product Hunt更新中にエラーが発生しました');
+      } finally {
+        const button = event.target;
+        button.disabled = false;
+        button.textContent = '🚀 Product Hunt更新';
       }
     }
     
