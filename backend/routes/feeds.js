@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../models/database');
 const Parser = require('rss-parser');
 const { updateProductHuntApps } = require('../utils/scheduler');
+const productHuntClient = require('../utils/producthunt-client');
 
 // RSS パーサーにタイムアウト設定を追加（20秒）
 const parser = new Parser({
@@ -276,9 +277,58 @@ router.post('/refresh-producthunt', async (req, res) => {
     }
   } catch (error) {
     console.error('Product Hunt manual refresh error:', error);
-    res.status(500).json({
+    
+    // Determine appropriate HTTP status code and user-friendly message
+    let statusCode = 500;
+    let userMessage = 'Failed to update Product Hunt apps';
+    
+    if (error.message.includes('token not configured')) {
+      statusCode = 503; // Service Unavailable
+      userMessage = 'Product Hunt API token not configured. Please set PRODUCTHUNT_API_TOKEN in environment variables.';
+    } else if (error.message.includes('authentication failed')) {
+      statusCode = 401; // Unauthorized
+      userMessage = 'Product Hunt API authentication failed. Please check your API token.';
+    } else if (error.message.includes('rate limit')) {
+      statusCode = 429; // Too Many Requests
+      userMessage = 'Product Hunt API rate limit exceeded. Please try again later.';
+    } else if (error.message.includes('Cannot connect')) {
+      statusCode = 503; // Service Unavailable
+      userMessage = 'Cannot connect to Product Hunt API. Please check your internet connection.';
+    }
+    
+    res.status(statusCode).json({
       error: error.message || 'Product Hunt update failed',
-      message: 'Failed to update Product Hunt apps'
+      message: userMessage,
+      details: 'Product Hunt integration requires proper API token configuration. Visit https://api.producthunt.com/v2/docs for setup instructions.'
+    });
+  }
+});
+
+// Product Hunt API接続テスト用エンドポイント
+router.get('/test-producthunt', async (req, res) => {
+  try {
+    console.log('Testing Product Hunt API connection...');
+    const isConnected = await productHuntClient.testConnection();
+    
+    if (isConnected) {
+      res.json({ 
+        success: true, 
+        message: 'Product Hunt API connection successful',
+        status: 'connected'
+      });
+    } else {
+      res.status(503).json({ 
+        success: false, 
+        message: 'Product Hunt API connection failed',
+        status: 'disconnected'
+      });
+    }
+  } catch (error) {
+    console.error('Product Hunt API test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+      status: 'error'
     });
   }
 });

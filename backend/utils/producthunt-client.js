@@ -6,14 +6,15 @@ class ProductHuntClient {
     this.baseURL = 'https://api.producthunt.com/v2/api/graphql';
     this.token = process.env.PRODUCTHUNT_API_TOKEN;
     
-    if (!this.token) {
-      console.warn('PRODUCTHUNT_API_TOKEN not found in environment variables');
+    if (!this.token || this.token === 'your_product_hunt_api_token_here') {
+      console.warn('PRODUCTHUNT_API_TOKEN not configured properly in environment variables');
+      console.warn('Please visit https://api.producthunt.com/v2/docs to create an app and get your API token');
     }
   }
 
   async makeRequest(query, variables = {}) {
-    if (!this.token) {
-      throw new Error('Product Hunt API token not configured');
+    if (!this.token || this.token === 'your_product_hunt_api_token_here') {
+      throw new Error('Product Hunt API token not configured properly. Please set PRODUCTHUNT_API_TOKEN in your .env file. Visit https://api.producthunt.com/v2/docs to create an app and get your API token.');
     }
 
     try {
@@ -35,8 +36,20 @@ class ProductHuntClient {
 
       return data.data;
     } catch (error) {
-      console.error('Product Hunt API request failed:', error);
-      throw error;
+      console.error('Product Hunt API request failed:', error.response?.data || error.message);
+      
+      // Provide more specific error messages
+      if (error.response?.status === 401) {
+        throw new Error('Product Hunt API authentication failed. Please check your PRODUCTHUNT_API_TOKEN.');
+      } else if (error.response?.status === 403) {
+        throw new Error('Product Hunt API access forbidden. Please verify your token has the correct permissions.');
+      } else if (error.response?.status === 429) {
+        throw new Error('Product Hunt API rate limit exceeded. Please try again later.');
+      } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        throw new Error('Cannot connect to Product Hunt API. Please check your internet connection.');
+      }
+      
+      throw new Error(`Product Hunt API error: ${error.message}`);
     }
   }
 

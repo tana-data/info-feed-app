@@ -1464,7 +1464,21 @@
           loadArticles();
         } else {
           const errorData = await response.json();
-          alert(`Product Hunt更新に失敗しました: ${errorData.error || errorData.message || 'Unknown error'}`);
+          let errorMessage = 'Unknown error';
+          
+          if (response.status === 503 && errorData.message && errorData.message.includes('token not configured')) {
+            errorMessage = `Product Hunt API設定エラー:\n\n${errorData.message}\n\n設定手順:\n1. https://api.producthunt.com/v2/docs にアクセス\n2. アプリを作成してAPI tokenを取得\n3. .envファイルにPRODUCTHUNT_API_TOKENを設定`;
+          } else if (response.status === 401) {
+            errorMessage = `Product Hunt API認証エラー:\n\n${errorData.message}\n\nAPI tokenが無効または期限切れの可能性があります。`;
+          } else if (response.status === 429) {
+            errorMessage = `Product Hunt APIレート制限:\n\n${errorData.message}\n\n数分後に再試行してください。`;
+          } else if (response.status === 503 && errorData.message && errorData.message.includes('Cannot connect')) {
+            errorMessage = `Product Hunt API接続エラー:\n\n${errorData.message}\n\nインターネット接続を確認してください。`;
+          } else {
+            errorMessage = `Product Hunt更新に失敗しました:\n\n${errorData.message || errorData.error || 'Unknown error'}`;
+          }
+          
+          alert(errorMessage);
         }
       } catch (error) {
         console.error('Error refreshing Product Hunt:', error);

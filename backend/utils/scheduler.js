@@ -181,6 +181,14 @@ async function updateProductHuntApps() {
   try {
     console.log('Fetching Product Hunt top apps...');
     
+    // Check if API token is properly configured before proceeding
+    const token = process.env.PRODUCTHUNT_API_TOKEN;
+    if (!token || token === 'your_product_hunt_api_token_here') {
+      const errorMsg = 'Product Hunt API token not configured properly. Please set PRODUCTHUNT_API_TOKEN in your .env file.';
+      console.error('✗ Product Hunt update failed:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+    
     // Ensure Product Hunt virtual feed exists
     await ensureProductHuntFeed();
     

@@ -230,3 +230,28 @@ Manual testing involves:
 | ✅ Article List Display | Show the following items in the UI: <br>- Article title <br>- Article summary (if available) <br>- Original link (external URL) <br>- Summary link (YouTube/Podcast only) <br>- Read status checkbox | Minimum 5 items required. Summary link can be a "request" button even if not yet summarized |
 | ✅ Read Status Management | Maintain "read status" for each article. Hide checked articles in subsequent displays | State storage can use local JSON/DB, initially keep it simple |
 | ✅ Sorting | Sort by newest (group by Feed or overall to be determined later) | Optional sorting/filtering in Ver.2 and beyond |
+
+## ⚠️ 重要な開発方針
+
+### RSS Feed機能の変更禁止 (2025-07-22更新)
+
+**RSS Feed Registration、Processing、およびDatabase Operations に関する機能は完成しており、これ以上の変更・改修を行ってはいけません。**
+
+#### 理由
+- RSS Feed登録機能は完全に動作し、パフォーマンスも最適化済み（<1秒で登録完了）
+- 複数回の最適化により安定した状態を実現
+- 追加の変更はバグやパフォーマンス劣化のリスクが高い
+
+#### 禁止対象
+- `backend/routes/feeds.js` の RSS処理ロジック
+- `backend/models/database.js` および `database-adapter.js`
+- RSS Feed Registration API endpoints
+- Database query最適化
+- Feed processing performance改善
+
+#### 例外
+- UI/UX改善（フロントエンド表示のみ）
+- 新機能追加（既存RSS機能に影響しない範囲）
+- バグ修正（ただし慎重に検討すること）
+
+**この機能に触る前に、必ずユーザーに確認を取ること。**
