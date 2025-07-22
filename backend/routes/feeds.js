@@ -16,60 +16,115 @@ router.get('/', (req, res) => {
 
 router.post('/', async (req, res) => {
   const { url } = req.body;
+  const requestId = Math.random().toString(36).substring(7);
+  
+  console.log(`🚀 [${requestId}] Feed registration request started:`, {
+    url: url,
+    timestamp: new Date().toISOString(),
+    userAgent: req.get('User-Agent')
+  });
   
   if (!url) {
+    console.log(`❌ [${requestId}] Missing URL parameter`);
     return res.status(400).json({ error: 'URL is required' });
   }
 
+  // URL validation
   try {
+    new URL(url);
+    console.log(`✅ [${requestId}] URL format validation passed`);
+  } catch (e) {
+    console.log(`❌ [${requestId}] Invalid URL format:`, e.message);
+    return res.status(400).json({ error: 'Invalid URL format' });
+  }
+
+  try {
+    console.log(`📡 [${requestId}] Starting RSS feed parsing for: ${url}`);
+    const startTime = Date.now();
+    
     const feed = await parser.parseURL(url);
+    const parseTime = Date.now() - startTime;
+    
+    console.log(`✅ [${requestId}] RSS feed parsed successfully:`, {
+      title: feed.title,
+      itemCount: feed.items?.length || 0,
+      parseTime: `${parseTime}ms`,
+      description: feed.description?.substring(0, 100)
+    });
     
     // 既存のFeed（削除済み含む）をチェック
     db.get('SELECT id, is_active FROM feeds WHERE url = ?', [url], (err, existingFeed) => {
       if (err) {
+        console.error(`❌ [${requestId}] Database error during feed check:`, err);
         return res.status(500).json({ error: err.message });
       }
       
-      console.log(`Feed registration check: URL=${url}, Existing Feed:`, existingFeed);
+      console.log(`🔍 [${requestId}] Feed existence check result:`, {
+        url: url,
+        existingFeed: existingFeed,
+        isActive: existingFeed?.is_active
+      });
       
       if (existingFeed) {
         if (existingFeed.is_active === 1) {
-          console.log(`Feed already active: ID=${existingFeed.id}, URL=${url}`);
+          console.log(`ℹ️ [${requestId}] Feed already active: ID=${existingFeed.id}`);
           return res.status(409).json({ error: 'Feed already exists' });
         } else {
-          console.log(`Reactivating deleted feed: ID=${existingFeed.id}, URL=${url}`);
+          console.log(`🔄 [${requestId}] Reactivating deleted feed: ID=${existingFeed.id}`);
           // 削除済みFeedを再アクティブ化
           db.run(
             'UPDATE feeds SET is_active = 1, title = ?, description = ?, last_updated = CURRENT_TIMESTAMP WHERE id = ?',
             [feed.title || '', feed.description || '', existingFeed.id],
             function(err) {
               if (err) {
+                console.error(`❌ [${requestId}] Error reactivating feed:`, err);
                 return res.status(500).json({ error: err.message });
               }
               
+              console.log(`✅ [${requestId}] Feed reactivated, processing initial articles`);
               // 最新5記事を取得して追加
-              processNewFeedArticles(existingFeed.id, url, feed.title || '', res);
+              processNewFeedArticles(existingFeed.id, url, feed.title || '', res, requestId);
             }
           );
         }
       } else {
+        console.log(`➕ [${requestId}] Adding new feed to database`);
         // 新規Feed追加
         db.run(
           'INSERT INTO feeds (url, title, description, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
           [url, feed.title || '', feed.description || ''],
           function(err) {
             if (err) {
+              console.error(`❌ [${requestId}] Error inserting new feed:`, err);
               return res.status(500).json({ error: err.message });
             }
             
+            const feedId = this.lastID;
+            console.log(`✅ [${requestId}] New feed inserted with ID: ${feedId}, processing initial articles`);
             // 最新5記事を取得して追加
-            processNewFeedArticles(this.lastID, url, feed.title || '', res);
+            processNewFeedArticles(feedId, url, feed.title || '', res, requestId);
           }
         );
       }
     });
   } catch (error) {
-    res.status(400).json({ error: 'Invalid RSS feed URL or unable to parse feed' });
+    console.error(`❌ [${requestId}] RSS parsing failed:`, {
+      url: url,
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
+    
+    let errorMessage = 'Invalid RSS feed URL or unable to parse feed';
+    if (error.message.includes('timeout')) {
+      errorMessage = 'RSS feed request timed out. Please try again.';
+    } else if (error.message.includes('ENOTFOUND')) {
+      errorMessage = 'RSS feed URL not found. Please check the URL.';
+    } else if (error.message.includes('ECONNREFUSED')) {
+      errorMessage = 'Connection refused. The server may be down.';
+    }
+    
+    res.status(400).json({ error: errorMessage });
   }
 });
 
@@ -233,22 +288,41 @@ router.post('/refresh-producthunt', async (req, res) => {
 });
 
 // 新規Feed追加時の記事処理（最新5件のみ）
-async function processNewFeedArticles(feedId, feedUrl, feedTitle, res) {
+async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId) {
+  const startTime = Date.now();
+  console.log(`🔄 [${requestId}] Starting article processing for feed: ${feedTitle} (ID: ${feedId})`);
+  
   try {
+    console.log(`📡 [${requestId}] Re-parsing RSS feed for article extraction: ${feedUrl}`);
     const parsedFeed = await parser.parseURL(feedUrl);
+    const parseTime = Date.now() - startTime;
     
     // 最新5件のみに制限し、日付順でソート
     const sortedItems = parsedFeed.items
       .sort((a, b) => new Date(b.pubDate || b.isoDate || 0) - new Date(a.pubDate || a.isoDate || 0))
       .slice(0, 5);
 
-    console.log(`📊 Adding ${sortedItems.length} initial articles for new feed: ${feedTitle}`);
-    console.log(`🔍 New Feed processing: Total items in RSS: ${parsedFeed.items.length}, Limited to: ${sortedItems.length}`);
+    console.log(`📊 [${requestId}] Article processing details:`, {
+      feedTitle: feedTitle,
+      totalRssItems: parsedFeed.items.length,
+      itemsToProcess: sortedItems.length,
+      parseTime: `${parseTime}ms`
+    });
     
     let newArticlesCount = 0;
-    for (const item of sortedItems) {
+    let errorCount = 0;
+    
+    for (let i = 0; i < sortedItems.length; i++) {
+      const item = sortedItems[i];
       const guid = item.guid || item.link;
       const contentType = detectContentType(item.link);
+      
+      console.log(`📝 [${requestId}] Processing article ${i + 1}/${sortedItems.length}:`, {
+        title: item.title?.substring(0, 50) + '...',
+        guid: guid?.substring(0, 50) + '...',
+        contentType: contentType,
+        pubDate: item.pubDate || item.isoDate
+      });
       
       try {
         await new Promise((resolve, reject) => {
@@ -267,40 +341,61 @@ async function processNewFeedArticles(feedId, feedUrl, feedTitle, res) {
             ],
             function(err) {
               if (err) {
-                if (err.code !== 'SQLITE_CONSTRAINT') {
-                  console.error('Article insert error:', err);
+                if (err.code === 'SQLITE_CONSTRAINT' || err.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+                  console.log(`ℹ️ [${requestId}] Article already exists (duplicate GUID): ${guid?.substring(0, 30)}...`);
+                } else {
+                  console.error(`❌ [${requestId}] Article insert error:`, err);
+                  errorCount++;
                 }
-                resolve(); // 重複エラーは無視
+                resolve(); // 重複エラーは正常として扱う
               } else {
                 newArticlesCount++;
+                console.log(`✅ [${requestId}] Article added successfully: ${item.title?.substring(0, 30)}...`);
                 resolve();
               }
             }
           );
         });
       } catch (error) {
-        console.error('Error inserting article:', error);
+        console.error(`❌ [${requestId}] Error inserting article:`, error);
+        errorCount++;
       }
     }
     
-    console.log(`✅ Successfully added ${newArticlesCount} articles for feed: ${feedTitle}`);
+    const totalTime = Date.now() - startTime;
+    console.log(`✅ [${requestId}] Article processing completed:`, {
+      feedTitle: feedTitle,
+      newArticlesAdded: newArticlesCount,
+      duplicatesSkipped: sortedItems.length - newArticlesCount - errorCount,
+      errors: errorCount,
+      totalProcessingTime: `${totalTime}ms`
+    });
     
     res.status(201).json({
       id: feedId,
       url: feedUrl,
       title: feedTitle,
       message: `Feed added successfully with ${newArticlesCount} articles`,
-      articlesAdded: newArticlesCount
+      articlesAdded: newArticlesCount,
+      duplicatesSkipped: sortedItems.length - newArticlesCount - errorCount,
+      processingTime: totalTime
     });
     
   } catch (error) {
-    console.error('Error processing new feed articles:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`❌ [${requestId}] Error processing new feed articles:`, {
+      error: error.message,
+      feedUrl: feedUrl,
+      processingTime: `${totalTime}ms`
+    });
+    
     res.status(201).json({
       id: feedId,
       url: feedUrl,
       title: feedTitle,
       message: 'Feed added successfully, but failed to fetch initial articles',
-      articlesAdded: 0
+      articlesAdded: 0,
+      error: error.message
     });
   }
 }

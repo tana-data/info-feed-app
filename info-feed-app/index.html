@@ -457,7 +457,14 @@
   </div>
 
   <script>
-    const API_BASE = '';
+    // API Base URL の設定（本番環境とローカル環境に対応）
+    const API_BASE = window.location.origin.includes('localhost') || 
+                     window.location.origin.includes('127.0.0.1') ? 
+                     '' : // ローカル環境では相対パス
+                     window.location.origin; // 本番環境ではフルパス
+    
+    console.log('🔧 API_BASE configured:', API_BASE);
+    console.log('🔧 Current origin:', window.location.origin);
     
     // 日本語テキストを指定文字数で切り捨てる関数
     function truncateText(text, maxLength = 100) {
@@ -1497,32 +1504,110 @@
     
     async function addFeed() {
       const url = document.getElementById('feed-url').value.trim();
-      if (!url) return;
+      if (!url) {
+        alert('RSS Feed URLを入力してください。');
+        return;
+      }
+      
+      // URLの基本的な妥当性チェック
+      try {
+        new URL(url);
+      } catch (e) {
+        alert('有効なURLを入力してください。');
+        return;
+      }
+      
+      const addButton = document.querySelector('.feed-form button');
+      const originalText = addButton.textContent;
+      
+      console.log('🚀 Starting feed addition:', url);
       
       try {
+        // UIを更新してユーザーに処理中を示す
+        addButton.disabled = true;
+        addButton.textContent = '処理中...';
+        
+        console.log('📡 Sending POST request to /api/feeds');
+        
+        // タイムアウトを設定（30秒）
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          console.log('⏰ Request aborted due to timeout');
+        }, 30000);
+        
         const response = await fetch(`${API_BASE}/api/feeds`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
+          body: JSON.stringify({ url }),
+          signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        
+        console.log('📡 Response received:', response.status, response.statusText);
         
         if (response.ok) {
           const result = await response.json();
+          console.log('✅ Feed addition successful:', result);
+          
           document.getElementById('feed-url').value = '';
           loadFeeds();
-          alert(result.message || 'Feedを追加しました');
+          
+          // 成功メッセージを詳細に表示
+          const articleCount = result.articlesAdded || 0;
+          const message = `✅ ${result.title || 'Feed'}を追加しました\n📄 ${articleCount}件の記事を取得`;
+          alert(message);
+          
         } else {
           const error = await response.json();
-          console.error('Feed addition error:', error);
-          if (error.error === 'Feed already exists') {
-            alert('エラー: このFeedは既に登録されています。\n削除済みのFeedを再登録したい場合は、同じURLを再度入力してください。');
+          console.error('❌ Feed addition error:', error);
+          console.error('Full error response:', {
+            status: response.status,
+            statusText: response.statusText,
+            error: error
+          });
+          
+          let errorMessage = '';
+          if (response.status === 400) {
+            errorMessage = `❌ 無効なRSS Feed URL\n\n詳細: ${error.error || 'URLを確認してください'}`;
+          } else if (response.status === 409) {
+            errorMessage = `ℹ️ このFeedは既に登録されています\n\n削除済みのFeedを再登録したい場合は、同じURLを再度入力してください。`;
+          } else if (response.status === 500) {
+            errorMessage = `❌ サーバーエラーが発生しました\n\n詳細: ${error.error || 'しばらく待ってから再試行してください'}\n\nURL: ${url}`;
           } else {
-            alert(`エラー: ${error.error}`);
+            errorMessage = `❌ Feed追加エラー (${response.status})\n\n詳細: ${error.error || '不明なエラー'}\n\nURL: ${url}`;
           }
+          
+          alert(errorMessage);
         }
       } catch (error) {
-        console.error('Error adding feed:', error);
-        alert('Feedの追加に失敗しました');
+        console.error('❌ Network error adding feed:', error);
+        console.error('Error details:', {
+          message: error.message,
+          name: error.name,
+          stack: error.stack
+        });
+        
+        let networkErrorMessage = '❌ ネットワークエラーが発生しました\n\n';
+        
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          networkErrorMessage += '原因: サーバーに接続できません\n';
+          networkErrorMessage += '対処: ネットワーク接続を確認してください';
+        } else if (error.name === 'AbortError') {
+          networkErrorMessage += '原因: リクエストがタイムアウトしました\n';
+          networkErrorMessage += '対処: しばらく待ってから再試行してください';
+        } else {
+          networkErrorMessage += `詳細: ${error.message}\n`;
+          networkErrorMessage += 'ページを更新して再試行してください';
+        }
+        
+        alert(networkErrorMessage);
+      } finally {
+        // UIを元に戻す
+        addButton.disabled = false;
+        addButton.textContent = originalText;
+        console.log('🔄 Feed addition process completed');
       }
     }
     
