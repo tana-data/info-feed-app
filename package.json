@@ -1,6 +1,6 @@
 {
   "name": "my-newsfeeder",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "RSS Feed管理とYouTube/Podcast要約機能を持つ情報収集ツール",
   "main": "server.js",
   "scripts": {
