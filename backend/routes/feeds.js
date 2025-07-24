@@ -262,17 +262,29 @@ router.post('/refresh', async (req, res) => {
 router.post('/refresh-producthunt', async (req, res) => {
   try {
     console.log('Manual Product Hunt refresh requested');
-    const result = await updateProductHuntApps();
+    
+    // Set a request timeout of 35 seconds
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Request timed out after 35 seconds')), 35000);
+    });
+    
+    const updatePromise = updateProductHuntApps();
+    
+    // Race between update and timeout
+    const result = await Promise.race([updatePromise, timeoutPromise]);
     
     if (result.success) {
       res.json({
-        message: `Product Hunt update completed: ${result.newApps} new apps added`,
-        newApps: result.newApps
+        message: result.message || `Product Hunt update completed: ${result.newApps} apps processed`,
+        newApps: result.newApps,
+        elapsed: result.elapsed,
+        sampleApps: result.sampleApps || []
       });
     } else {
       res.status(500).json({
         error: result.error || 'Product Hunt update failed',
-        message: 'Failed to update Product Hunt apps'
+        message: 'Failed to update Product Hunt apps',
+        elapsed: result.elapsed
       });
     }
   } catch (error) {
@@ -282,7 +294,10 @@ router.post('/refresh-producthunt', async (req, res) => {
     let statusCode = 500;
     let userMessage = 'Failed to update Product Hunt apps';
     
-    if (error.message.includes('credentials not configured')) {
+    if (error.message.includes('timed out')) {
+      statusCode = 408; // Request Timeout
+      userMessage = 'Product Hunt update timed out. The operation took too long to complete.';
+    } else if (error.message.includes('credentials not configured')) {
       statusCode = 503; // Service Unavailable
       userMessage = 'Product Hunt API client credentials not configured. Please set PRODUCTHUNT_CLIENT_ID and PRODUCTHUNT_CLIENT_SECRET in environment variables.';
     } else if (error.message.includes('authentication failed')) {
@@ -299,7 +314,7 @@ router.post('/refresh-producthunt', async (req, res) => {
     res.status(statusCode).json({
       error: error.message || 'Product Hunt update failed',
       message: userMessage,
-      details: 'Product Hunt integration requires proper API token configuration. Visit https://api.producthunt.com/v2/docs for setup instructions.'
+      details: 'Product Hunt integration requires proper API configuration. Visit https://api.producthunt.com/v2/docs for setup instructions.'
     });
   }
 });
