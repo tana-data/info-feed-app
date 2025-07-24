@@ -1448,7 +1448,17 @@
         
         if (response.ok) {
           const data = await response.json();
-          alert(`Product Hunt更新完了: ${data.newApps} 個の新しいアプリを追加しました`);
+          // Success message with API integration details
+          const successMessage = data.message ? 
+            `Product Hunt更新完了!\n\n${data.message}\n\n取得したアプリ数: ${data.newApps}個\n処理時間: ${data.elapsed}ms` :
+            `Product Hunt更新完了: ${data.newApps} 個の新しいアプリを処理しました`;
+          
+          alert(successMessage);
+          
+          // Show sample apps if available
+          if (data.sampleApps && data.sampleApps.length > 0) {
+            console.log('Sample Product Hunt apps:', data.sampleApps);
+          }
           
           // 記事一覧をクリアしてから新しい記事のみを読み込み
           const container = document.getElementById('articles-container');
@@ -1466,10 +1476,12 @@
           const errorData = await response.json();
           let errorMessage = 'Unknown error';
           
-          if (response.status === 503 && errorData.message && errorData.message.includes('token not configured')) {
-            errorMessage = `Product Hunt API設定エラー:\n\n${errorData.message}\n\n設定手順:\n1. https://api.producthunt.com/v2/docs にアクセス\n2. アプリを作成してAPI tokenを取得\n3. .envファイルにPRODUCTHUNT_API_TOKENを設定`;
+          if (response.status === 503 && errorData.message && (errorData.message.includes('credentials not configured') || errorData.message.includes('token not configured'))) {
+            errorMessage = `Product Hunt API設定エラー:\n\n${errorData.message}\n\n設定手順:\n1. https://api.producthunt.com/v2/docs にアクセス\n2. アプリを作成してClient IDとSecretを取得\n3. .envファイルにPRODUCTHUNT_CLIENT_IDとPRODUCTHUNT_CLIENT_SECRETを設定`;
           } else if (response.status === 401) {
-            errorMessage = `Product Hunt API認証エラー:\n\n${errorData.message}\n\nAPI tokenが無効または期限切れの可能性があります。`;
+            errorMessage = `Product Hunt API認証エラー:\n\n${errorData.message}\n\nClient credentialsが無効または期限切れの可能性があります。`;
+          } else if (response.status === 408) {
+            errorMessage = `Product Hunt更新タイムアウト:\n\n${errorData.message}\n\n処理に時間がかかりすぎました。再試行してください。`;
           } else if (response.status === 429) {
             errorMessage = `Product Hunt APIレート制限:\n\n${errorData.message}\n\n数分後に再試行してください。`;
           } else if (response.status === 503 && errorData.message && errorData.message.includes('Cannot connect')) {
