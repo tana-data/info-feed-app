@@ -282,12 +282,12 @@ router.post('/refresh-producthunt', async (req, res) => {
     let statusCode = 500;
     let userMessage = 'Failed to update Product Hunt apps';
     
-    if (error.message.includes('token not configured')) {
+    if (error.message.includes('credentials not configured')) {
       statusCode = 503; // Service Unavailable
-      userMessage = 'Product Hunt API token not configured. Please set PRODUCTHUNT_API_TOKEN in environment variables.';
+      userMessage = 'Product Hunt API client credentials not configured. Please set PRODUCTHUNT_CLIENT_ID and PRODUCTHUNT_CLIENT_SECRET in environment variables.';
     } else if (error.message.includes('authentication failed')) {
       statusCode = 401; // Unauthorized
-      userMessage = 'Product Hunt API authentication failed. Please check your API token.';
+      userMessage = 'Product Hunt API authentication failed. Please check your client credentials.';
     } else if (error.message.includes('rate limit')) {
       statusCode = 429; // Too Many Requests
       userMessage = 'Product Hunt API rate limit exceeded. Please try again later.';

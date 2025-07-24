@@ -181,10 +181,13 @@ async function updateProductHuntApps() {
   try {
     console.log('Fetching Product Hunt top apps...');
     
-    // Check if API token is properly configured before proceeding
-    const token = process.env.PRODUCTHUNT_API_TOKEN;
-    if (!token || token === 'your_product_hunt_api_token_here') {
-      const errorMsg = 'Product Hunt API token not configured properly. Please set PRODUCTHUNT_API_TOKEN in your .env file.';
+    // Check if API client credentials are properly configured before proceeding
+    const clientId = process.env.PRODUCTHUNT_CLIENT_ID;
+    const clientSecret = process.env.PRODUCTHUNT_CLIENT_SECRET;
+    if (!clientId || !clientSecret || 
+        clientId === 'your_client_id_here' || 
+        clientSecret === 'your_client_secret_here') {
+      const errorMsg = 'Product Hunt API client credentials not configured properly. Please set PRODUCTHUNT_CLIENT_ID and PRODUCTHUNT_CLIENT_SECRET in your .env file.';
       console.error('✗ Product Hunt update failed:', errorMsg);
       return { success: false, error: errorMsg };
     }

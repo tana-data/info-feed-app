@@ -4,18 +4,62 @@ const axios = require('axios');
 class ProductHuntClient {
   constructor() {
     this.baseURL = 'https://api.producthunt.com/v2/api/graphql';
-    this.token = process.env.PRODUCTHUNT_API_TOKEN;
+    this.oauthURL = 'https://api.producthunt.com/v2/oauth/token';
+    this.clientId = process.env.PRODUCTHUNT_CLIENT_ID;
+    this.clientSecret = process.env.PRODUCTHUNT_CLIENT_SECRET;
+    this.accessToken = null;
+    this.tokenExpiry = null;
     
-    if (!this.token || this.token === 'your_product_hunt_api_token_here') {
-      console.warn('PRODUCTHUNT_API_TOKEN not configured properly in environment variables');
-      console.warn('Please visit https://api.producthunt.com/v2/docs to create an app and get your API token');
+    if (!this.clientId || this.clientId === 'your_client_id_here') {
+      console.warn('PRODUCTHUNT_CLIENT_ID not configured properly in environment variables');
+      console.warn('Please visit https://api.producthunt.com/v2/docs to create an app and get your client credentials');
+    }
+    
+    if (!this.clientSecret || this.clientSecret === 'your_client_secret_here') {
+      console.warn('PRODUCTHUNT_CLIENT_SECRET not configured properly in environment variables');
+      console.warn('Please set your client secret from the Product Hunt API dashboard');
+    }
+  }
+
+  async getAccessToken() {
+    // Check if we have a valid token
+    if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
+      return this.accessToken;
+    }
+
+    // Get new access token using client credentials
+    if (!this.clientId || !this.clientSecret || 
+        this.clientId === 'your_client_id_here' || 
+        this.clientSecret === 'your_client_secret_here') {
+      throw new Error('Product Hunt API client credentials not configured properly. Please set PRODUCTHUNT_CLIENT_ID and PRODUCTHUNT_CLIENT_SECRET in your .env file. Visit https://api.producthunt.com/v2/docs to create an app and get your client credentials.');
+    }
+
+    try {
+      const response = await axios.post(this.oauthURL, {
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        grant_type: 'client_credentials'
+      }, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = response.data;
+      this.accessToken = data.access_token;
+      // Token typically expires in 1 hour, set expiry a bit earlier to be safe
+      this.tokenExpiry = Date.now() + (data.expires_in ? (data.expires_in - 300) * 1000 : 3300 * 1000);
+      
+      console.log('✅ Product Hunt access token obtained successfully');
+      return this.accessToken;
+    } catch (error) {
+      console.error('❌ Failed to get Product Hunt access token:', error.response?.data || error.message);
+      throw new Error(`Failed to obtain Product Hunt access token: ${error.response?.data?.error_description || error.message}`);
     }
   }
 
   async makeRequest(query, variables = {}) {
-    if (!this.token || this.token === 'your_product_hunt_api_token_here') {
-      throw new Error('Product Hunt API token not configured properly. Please set PRODUCTHUNT_API_TOKEN in your .env file. Visit https://api.producthunt.com/v2/docs to create an app and get your API token.');
-    }
+    const accessToken = await this.getAccessToken();
 
     try {
       const response = await axios.post(this.baseURL, {
@@ -24,7 +68,7 @@ class ProductHuntClient {
       }, {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.token}`
+          'Authorization': `Bearer ${accessToken}`
         }
       });
 
@@ -40,9 +84,9 @@ class ProductHuntClient {
       
       // Provide more specific error messages
       if (error.response?.status === 401) {
-        throw new Error('Product Hunt API authentication failed. Please check your PRODUCTHUNT_API_TOKEN.');
+        throw new Error('Product Hunt API authentication failed. Please check your client credentials.');
       } else if (error.response?.status === 403) {
-        throw new Error('Product Hunt API access forbidden. Please verify your token has the correct permissions.');
+        throw new Error('Product Hunt API access forbidden. Please verify your client credentials have the correct permissions.');
       } else if (error.response?.status === 429) {
         throw new Error('Product Hunt API rate limit exceeded. Please try again later.');
       } else if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
