@@ -3,13 +3,19 @@ const router = express.Router();
 const db = require('../models/database');
 const fs = require('fs');
 const path = require('path');
+const { sendError, sendSuccess, handleDatabaseError } = require('../utils/response-helpers');
 
 // フィードデータのバックアップエンドポイント
 router.get('/feeds', (req, res) => {
+  console.log('📥 Backup request received - fetching active feeds');
+  
   db.all('SELECT * FROM feeds WHERE is_active = 1', (err, feeds) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      console.error('❌ Database error during backup:', err);
+      return handleDatabaseError(res, err, 'fetch feeds for backup');
     }
+    
+    console.log(`✅ Found ${feeds.length} active feeds for backup`);
     
     const backup = {
       timestamp: new Date().toISOString(),
@@ -17,17 +23,27 @@ router.get('/feeds', (req, res) => {
       feeds: feeds
     };
     
-    res.json(backup);
+    sendSuccess(res, backup, `Backup created with ${feeds.length} feeds`);
   });
 });
 
 // フィードデータのリストアエンドポイント
 router.post('/feeds/restore', (req, res) => {
+  console.log('📤 Restore request received');
+  console.log('Request body:', JSON.stringify(req.body, null, 2));
+  
   const { feeds } = req.body;
   
   if (!feeds || !Array.isArray(feeds)) {
-    return res.status(400).json({ error: 'Invalid backup data. Expected feeds array.' });
+    console.error('❌ Invalid backup data format:', { feeds, type: typeof feeds, isArray: Array.isArray(feeds) });
+    return sendError(res, 400, 'Invalid backup data. Expected feeds array.', {
+      received: typeof feeds,
+      expected: 'array',
+      data: feeds ? 'feeds data received but not array' : 'no feeds data received'
+    });
   }
+  
+  console.log(`📊 Processing restore for ${feeds.length} feeds`);
   
   let restoredCount = 0;
   let errorCount = 0;
@@ -86,18 +102,20 @@ router.post('/feeds/restore', (req, res) => {
       }
     }
     
-    res.json({
-      message: `Restore completed: ${restoredCount} feeds restored, ${errorCount} errors`,
+    console.log(`✅ Restore completed: ${restoredCount} feeds restored, ${errorCount} errors`);
+    
+    sendSuccess(res, {
       restoredCount,
       errorCount,
       errors: errors.length > 0 ? errors : undefined
-    });
+    }, `Restore completed: ${restoredCount} feeds restored, ${errorCount} errors`);
   };
   
   processFeeds().catch(error => {
-    res.status(500).json({
-      error: 'Restore process failed',
-      message: error.message
+    console.error('❌ Restore process failed:', error);
+    sendError(res, 500, 'Restore process failed', {
+      error: error.message,
+      stack: error.stack
     });
   });
 });
@@ -108,15 +126,15 @@ router.get('/info', (req, res) => {
   
   db.get('SELECT COUNT(*) as feed_count FROM feeds WHERE is_active = 1', (err, feedResult) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      return handleDatabaseError(res, err, 'fetch feed count');
     }
     
     db.get('SELECT COUNT(*) as article_count FROM articles', (err, articleResult) => {
       if (err) {
-        return res.status(500).json({ error: err.message });
+        return handleDatabaseError(res, err, 'fetch article count');
       }
       
-      res.json({
+      sendSuccess(res, {
         version: require('../../package.json').version,
         database: {
           type: dbAdapter.dbType || 'unknown',
@@ -127,9 +145,8 @@ router.get('/info', (req, res) => {
           node_env: process.env.NODE_ENV,
           railway: !!process.env.RAILWAY_ENVIRONMENT,
           database_url_set: !!process.env.DATABASE_URL
-        },
-        timestamp: new Date().toISOString()
-      });
+        }
+      }, 'System information retrieved successfully');
     });
   });
 });

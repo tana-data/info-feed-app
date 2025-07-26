@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.6.5</span></title>
+  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.6.6</span></title>
   
   <!-- PWA用メタタグ -->
   <link rel="manifest" href="manifest.json">
@@ -424,7 +424,7 @@
   </style>
 </head>
 <body>
-  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.6.5</small></h1>
+  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.6.6</small></h1>
   
   <div class="tabs">
     <button class="tab active" onclick="switchTab('articles')">記事一覧</button>
@@ -1789,7 +1789,10 @@
       try {
         const response = await fetch(`${API_BASE}/api/backup/feeds`);
         if (response.ok) {
-          const backup = await response.json();
+          const result = await response.json();
+          // Handle new standardized response format
+          const backup = result.success ? result.data : result;
+          
           const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
@@ -1797,9 +1800,13 @@
           a.download = `newsfeeder-backup-${new Date().toISOString().split('T')[0]}.json`;
           a.click();
           URL.revokeObjectURL(url);
-          alert(`フィードバックアップが完了しました。${backup.feeds.length}件のフィードがエクスポートされました。`);
+          
+          const message = result.message || `フィードバックアップが完了しました。${backup.feeds.length}件のフィードがエクスポートされました。`;
+          alert(message);
         } else {
-          alert('バックアップに失敗しました。');
+          const errorData = await response.json();
+          const errorMsg = errorData.error || errorData.message || 'Unknown error';
+          alert(`バックアップに失敗しました: ${errorMsg}`);
         }
       } catch (error) {
         console.error('Backup error:', error);
@@ -1841,12 +1848,23 @@
 
         if (response.ok) {
           const result = await response.json();
-          alert(`復元完了: ${result.restoredCount}件のフィードを復元しました。`);
+          // Handle new standardized response format
+          const data = result.success ? result.data : result;
+          const message = result.message || `復元完了: ${data.restoredCount}件のフィードを復元しました。`;
+          
+          if (data.errorCount > 0) {
+            alert(`${message}\n\nエラー: ${data.errorCount}件\n詳細: ${data.errors ? data.errors.join('\n') : '詳細なし'}`);
+          } else {
+            alert(message);
+          }
+          
           closeRestoreModal();
           loadFeeds();
         } else {
-          const error = await response.json();
-          alert(`復元に失敗しました: ${error.message}`);
+          const errorData = await response.json();
+          const errorMsg = errorData.error || errorData.message || 'Unknown error';
+          console.error('Restore error details:', errorData);
+          alert(`復元に失敗しました: ${errorMsg}`);
         }
       } catch (error) {
         console.error('Restore error:', error);
@@ -1858,7 +1876,10 @@
       try {
         const response = await fetch(`${API_BASE}/api/backup/info`);
         if (response.ok) {
-          const info = await response.json();
+          const result = await response.json();
+          // Handle new standardized response format
+          const info = result.success ? result.data : result;
+          
           alert(`システム情報:
 バージョン: ${info.version}
 データベース: ${info.database.type}
@@ -1866,9 +1887,11 @@
 記事数: ${info.database.articles}
 環境: ${info.environment.node_env}
 Railway: ${info.environment.railway ? 'Yes' : 'No'}
-更新日時: ${new Date(info.timestamp).toLocaleString()}`);
+更新日時: ${new Date(result.timestamp || new Date()).toLocaleString()}`);
         } else {
-          alert('システム情報の取得に失敗しました。');
+          const errorData = await response.json();
+          const errorMsg = errorData.error || errorData.message || 'Unknown error';
+          alert(`システム情報の取得に失敗しました: ${errorMsg}`);
         }
       } catch (error) {
         console.error('System info error:', error);

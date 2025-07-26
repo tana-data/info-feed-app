@@ -10,14 +10,19 @@ class ProductHuntClient {
     this.accessToken = null;
     this.tokenExpiry = null;
     
-    if (!this.clientId || this.clientId === 'your_client_id_here') {
-      console.warn('PRODUCTHUNT_CLIENT_ID not configured properly in environment variables');
-      console.warn('Please visit https://api.producthunt.com/v2/docs to create an app and get your client credentials');
+    // Debug environment variables (masking sensitive data)
+    console.log('🔍 Product Hunt API Client initialization:');
+    console.log('  CLIENT_ID:', this.clientId ? `${this.clientId.substring(0, 8)}...` : 'NOT SET');
+    console.log('  CLIENT_SECRET:', this.clientSecret ? `${this.clientSecret.substring(0, 8)}...` : 'NOT SET');
+    
+    if (!this.clientId || this.clientId.trim() === '' || this.clientId === 'your_client_id_here') {
+      console.warn('⚠️  PRODUCTHUNT_CLIENT_ID not configured properly in environment variables');
+      console.warn('   Please visit https://api.producthunt.com/v2/docs to create an app and get your client credentials');
     }
     
-    if (!this.clientSecret || this.clientSecret === 'your_client_secret_here') {
-      console.warn('PRODUCTHUNT_CLIENT_SECRET not configured properly in environment variables');
-      console.warn('Please set your client secret from the Product Hunt API dashboard');
+    if (!this.clientSecret || this.clientSecret.trim() === '' || this.clientSecret === 'your_client_secret_here') {
+      console.warn('⚠️  PRODUCTHUNT_CLIENT_SECRET not configured properly in environment variables');
+      console.warn('   Please set your client secret from the Product Hunt API dashboard');
     }
   }
 
@@ -28,9 +33,15 @@ class ProductHuntClient {
     }
 
     // Get new access token using client credentials
+    console.log('🔐 Attempting to get Product Hunt access token...');
+    
     if (!this.clientId || !this.clientSecret || 
+        this.clientId.trim() === '' || this.clientSecret.trim() === '' ||
         this.clientId === 'your_client_id_here' || 
         this.clientSecret === 'your_client_secret_here') {
+      console.error('❌ Product Hunt API credentials validation failed');
+      console.error('   CLIENT_ID valid:', !!this.clientId && this.clientId.trim() !== '' && this.clientId !== 'your_client_id_here');
+      console.error('   CLIENT_SECRET valid:', !!this.clientSecret && this.clientSecret.trim() !== '' && this.clientSecret !== 'your_client_secret_here');
       throw new Error('Product Hunt API client credentials not configured properly. Please set PRODUCTHUNT_CLIENT_ID and PRODUCTHUNT_CLIENT_SECRET in your .env file. Visit https://api.producthunt.com/v2/docs to create an app and get your client credentials.');
     }
 
