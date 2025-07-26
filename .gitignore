@@ -5,10 +5,13 @@ package-lock.json
 # Environment variables
 .env
 
-# Database files
-*.db
+# Database files (exclude user data, include schema/seed files)
+newsfeeder.db
 *.sqlite
 *.sqlite3
+# Allow seed/schema database files if needed
+!*-schema.db
+!*-seed.db
 
 # Temporary files
 temp/

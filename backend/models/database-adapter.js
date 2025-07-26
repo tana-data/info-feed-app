@@ -2,9 +2,28 @@ const path = require('path');
 
 class DatabaseAdapter {
   constructor() {
-    this.dbType = process.env.DATABASE_TYPE || 'sqlite';
+    // Auto-detect database type based on environment
+    this.dbType = this.detectDatabaseType();
     this.db = null;
     this.init();
+  }
+
+  detectDatabaseType() {
+    // If DATABASE_URL is set (Railway PostgreSQL), use PostgreSQL
+    if (process.env.DATABASE_URL) {
+      console.log('Detected PostgreSQL via DATABASE_URL');
+      return 'postgresql';
+    }
+    
+    // If DATABASE_TYPE is explicitly set, use that
+    if (process.env.DATABASE_TYPE) {
+      console.log(`Database type explicitly set to: ${process.env.DATABASE_TYPE}`);
+      return process.env.DATABASE_TYPE;
+    }
+    
+    // Default to SQLite for local development
+    console.log('Using SQLite as default database');
+    return 'sqlite';
   }
 
   init() {
@@ -17,7 +36,24 @@ class DatabaseAdapter {
 
   initSQLite() {
     const sqlite3 = require('sqlite3').verbose();
-    const dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../newsfeeder.db');
+    const fs = require('fs');
+    
+    // Determine database path - use /app/data in production for Railway persistence
+    let dbPath;
+    if (process.env.NODE_ENV === 'production' && process.env.RAILWAY_ENVIRONMENT) {
+      // Railway production environment - use persistent volume
+      const dataDir = '/app/data';
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      dbPath = path.join(dataDir, 'newsfeeder.db');
+      console.log(`Using Railway persistent database path: ${dbPath}`);
+    } else {
+      // Local development
+      dbPath = process.env.DATABASE_PATH || path.join(__dirname, '../../newsfeeder.db');
+      console.log(`Using local database path: ${dbPath}`);
+    }
+    
     this.db = new sqlite3.Database(dbPath);
     console.log('SQLite database initialized');
     this.createTables();

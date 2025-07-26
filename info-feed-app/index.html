@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.6.2</span></title>
+  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.6.3</span></title>
   
   <!-- PWA用メタタグ -->
   <link rel="manifest" href="manifest.json">
@@ -206,6 +206,26 @@
       color: white;
       border-color: #da552f;
     }
+
+    .backup-controls {
+      margin: 1rem 0;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .backup-controls button {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .backup-controls button:hover {
+      opacity: 0.9;
+    }
     
     .summary-button:disabled {
       background-color: #6c757d;
@@ -404,7 +424,7 @@
   </style>
 </head>
 <body>
-  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.6.2</small></h1>
+  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.6.3</small></h1>
   
   <div class="tabs">
     <button class="tab active" onclick="switchTab('articles')">記事一覧</button>
@@ -435,7 +455,30 @@
     </div>
     
     <h3>登録済みFeed</h3>
+    <div class="backup-controls">
+      <button onclick="backupFeeds()" style="background-color: #28a745;">📥 フィードをバックアップ</button>
+      <button onclick="showRestoreModal()" style="background-color: #17a2b8;">📤 フィードを復元</button>
+      <button onclick="showSystemInfo()" style="background-color: #6c757d;">ℹ️ システム情報</button>
+    </div>
     <ul id="feeds-list" class="feed-list"></ul>
+  </div>
+
+  <!-- バックアップ復元モーダル -->
+  <div id="restore-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>フィード復元</h3>
+        <span class="close" onclick="closeRestoreModal()">&times;</span>
+      </div>
+      <div class="modal-body">
+        <p>バックアップファイル（JSON）を選択してフィードを復元してください。</p>
+        <input type="file" id="restore-file" accept=".json" />
+        <div class="modal-actions">
+          <button onclick="closeRestoreModal()">キャンセル</button>
+          <button onclick="restoreFeeds()" class="primary">復元実行</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 手動要約モーダル -->
@@ -1732,11 +1775,108 @@
       }
     }
     
+    // バックアップ・リストア機能
+    async function backupFeeds() {
+      try {
+        const response = await fetch(`${API_BASE}/api/backup/feeds`);
+        if (response.ok) {
+          const backup = await response.json();
+          const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `newsfeeder-backup-${new Date().toISOString().split('T')[0]}.json`;
+          a.click();
+          URL.revokeObjectURL(url);
+          alert(`フィードバックアップが完了しました。${backup.feeds.length}件のフィードがエクスポートされました。`);
+        } else {
+          alert('バックアップに失敗しました。');
+        }
+      } catch (error) {
+        console.error('Backup error:', error);
+        alert('バックアップ中にエラーが発生しました。');
+      }
+    }
+
+    function showRestoreModal() {
+      document.getElementById('restore-modal').style.display = 'block';
+    }
+
+    function closeRestoreModal() {
+      document.getElementById('restore-modal').style.display = 'none';
+      document.getElementById('restore-file').value = '';
+    }
+
+    async function restoreFeeds() {
+      const fileInput = document.getElementById('restore-file');
+      if (!fileInput.files[0]) {
+        alert('バックアップファイルを選択してください。');
+        return;
+      }
+
+      try {
+        const file = fileInput.files[0];
+        const text = await file.text();
+        const backup = JSON.parse(text);
+
+        if (!backup.feeds || !Array.isArray(backup.feeds)) {
+          alert('無効なバックアップファイルです。');
+          return;
+        }
+
+        const response = await fetch(`${API_BASE}/api/backup/feeds/restore`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backup)
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          alert(`復元完了: ${result.restoredCount}件のフィードを復元しました。`);
+          closeRestoreModal();
+          loadFeeds();
+        } else {
+          const error = await response.json();
+          alert(`復元に失敗しました: ${error.message}`);
+        }
+      } catch (error) {
+        console.error('Restore error:', error);
+        alert('復元中にエラーが発生しました。ファイル形式を確認してください。');
+      }
+    }
+
+    async function showSystemInfo() {
+      try {
+        const response = await fetch(`${API_BASE}/api/backup/info`);
+        if (response.ok) {
+          const info = await response.json();
+          alert(`システム情報:
+バージョン: ${info.version}
+データベース: ${info.database.type}
+フィード数: ${info.database.feeds}
+記事数: ${info.database.articles}
+環境: ${info.environment.node_env}
+Railway: ${info.environment.railway ? 'Yes' : 'No'}
+更新日時: ${new Date(info.timestamp).toLocaleString()}`);
+        } else {
+          alert('システム情報の取得に失敗しました。');
+        }
+      } catch (error) {
+        console.error('System info error:', error);
+        alert('システム情報取得中にエラーが発生しました。');
+      }
+    }
+
     // モーダル外クリックで閉じる
     window.onclick = function(event) {
-      const modal = document.getElementById('manual-summary-modal');
-      if (event.target === modal) {
+      const manualModal = document.getElementById('manual-summary-modal');
+      const restoreModal = document.getElementById('restore-modal');
+      
+      if (event.target === manualModal) {
         closeManualSummaryModal();
+      }
+      if (event.target === restoreModal) {
+        closeRestoreModal();
       }
     }
     

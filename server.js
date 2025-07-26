@@ -15,6 +15,7 @@ app.use(express.static(path.join(__dirname, 'info-feed-app')));
 app.use('/api/feeds', require('./backend/routes/feeds'));
 app.use('/api/articles', require('./backend/routes/articles'));
 app.use('/api/stats', require('./backend/routes/api-stats'));
+app.use('/api/backup', require('./backend/routes/backup'));
 
 app.get('/api/scheduler/status', (req, res) => {
   res.json(scheduler.getSchedulerStatus());
