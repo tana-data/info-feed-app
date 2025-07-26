@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.6.4</span></title>
+  <title>情報収集ツール <span style="font-size: 0.7em; color: #666;">Ver.0.6.5</span></title>
   
   <!-- PWA用メタタグ -->
   <link rel="manifest" href="manifest.json">
@@ -424,7 +424,7 @@
   </style>
 </head>
 <body>
-  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.6.4</small></h1>
+  <h1>情報収集ツール <small style="font-size: 0.6em; color: #666;">Ver.0.6.5</small></h1>
   
   <div class="tabs">
     <button class="tab active" onclick="switchTab('articles')">記事一覧</button>
@@ -572,9 +572,12 @@
       
       try {
         const response = await fetch(`${API_BASE}/api/articles?unread_only=${unreadOnly}&limit=${articlesPerPage}&offset=${currentOffset}`);
-        const data = await response.json();
+        const result = await response.json();
         
-        if (data.articles.length === 0) {
+        // Handle new standardized response format
+        const data = result.success ? result.data : result;
+        
+        if (!data.articles || data.articles.length === 0) {
           if (currentOffset === 0) {
             container.innerHTML = '<p>記事がありません</p>';
           }
@@ -1490,10 +1493,12 @@
         });
         
         if (response.ok) {
-          const data = await response.json();
+          const result = await response.json();
+          const data = result.success ? result.data : result;
+          
           // Success message with API integration details
-          const successMessage = data.message ? 
-            `Product Hunt更新完了!\n\n${data.message}\n\n取得したアプリ数: ${data.newApps}個\n処理時間: ${data.elapsed}ms` :
+          const successMessage = result.message ? 
+            `Product Hunt更新完了!\n\n${result.message}\n\n取得したアプリ数: ${data.newApps}個\n処理時間: ${data.elapsed}ms` :
             `Product Hunt更新完了: ${data.newApps} 個の新しいアプリを処理しました`;
           
           alert(successMessage);
@@ -1517,20 +1522,21 @@
           loadArticles();
         } else {
           const errorData = await response.json();
+          const errorMsg = errorData.error || errorData.message || 'Unknown error';
           let errorMessage = 'Unknown error';
           
-          if (response.status === 503 && errorData.message && (errorData.message.includes('credentials not configured') || errorData.message.includes('token not configured'))) {
-            errorMessage = `Product Hunt API設定エラー:\n\n${errorData.message}\n\n設定手順:\n1. https://api.producthunt.com/v2/docs にアクセス\n2. アプリを作成してClient IDとSecretを取得\n3. .envファイルにPRODUCTHUNT_CLIENT_IDとPRODUCTHUNT_CLIENT_SECRETを設定`;
+          if (response.status === 503 && errorMsg && (errorMsg.includes('credentials not configured') || errorMsg.includes('token not configured'))) {
+            errorMessage = `Product Hunt API設定エラー:\n\n${errorMsg}\n\n設定手順:\n1. https://api.producthunt.com/v2/docs にアクセス\n2. アプリを作成してClient IDとSecretを取得\n3. .envファイルにPRODUCTHUNT_CLIENT_IDとPRODUCTHUNT_CLIENT_SECRETを設定`;
           } else if (response.status === 401) {
-            errorMessage = `Product Hunt API認証エラー:\n\n${errorData.message}\n\nClient credentialsが無効または期限切れの可能性があります。`;
+            errorMessage = `Product Hunt API認証エラー:\n\n${errorMsg}\n\nClient credentialsが無効または期限切れの可能性があります。`;
           } else if (response.status === 408) {
-            errorMessage = `Product Hunt更新タイムアウト:\n\n${errorData.message}\n\n処理に時間がかかりすぎました。再試行してください。`;
+            errorMessage = `Product Hunt更新タイムアウト:\n\n${errorMsg}\n\n処理に時間がかかりすぎました。再試行してください。`;
           } else if (response.status === 429) {
-            errorMessage = `Product Hunt APIレート制限:\n\n${errorData.message}\n\n数分後に再試行してください。`;
-          } else if (response.status === 503 && errorData.message && errorData.message.includes('Cannot connect')) {
-            errorMessage = `Product Hunt API接続エラー:\n\n${errorData.message}\n\nインターネット接続を確認してください。`;
+            errorMessage = `Product Hunt APIレート制限:\n\n${errorMsg}\n\n数分後に再試行してください。`;
+          } else if (response.status === 503 && errorMsg && errorMsg.includes('Cannot connect')) {
+            errorMessage = `Product Hunt API接続エラー:\n\n${errorMsg}\n\nインターネット接続を確認してください。`;
           } else {
-            errorMessage = `Product Hunt更新に失敗しました:\n\n${errorData.message || errorData.error || 'Unknown error'}`;
+            errorMessage = `Product Hunt更新に失敗しました:\n\n${errorMsg}`;
           }
           
           alert(errorMessage);
@@ -1549,7 +1555,10 @@
     async function loadFeeds() {
       try {
         const response = await fetch(`${API_BASE}/api/feeds`);
-        const feeds = await response.json();
+        const result = await response.json();
+        
+        // Handle new standardized response format
+        const feeds = result.success ? result.data : result;
         
         const list = document.getElementById('feeds-list');
         list.innerHTML = '';
@@ -1827,7 +1836,7 @@
         const response = await fetch(`${API_BASE}/api/backup/feeds/restore`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(backup)
+          body: JSON.stringify({ feeds: backup.feeds })
         });
 
         if (response.ok) {

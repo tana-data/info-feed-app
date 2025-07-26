@@ -276,15 +276,13 @@ router.post('/refresh-producthunt', async (req, res) => {
     const result = await Promise.race([updatePromise, timeoutPromise]);
     
     if (result.success) {
-      res.json({
-        message: result.message || `Product Hunt update completed: ${result.newApps} apps processed`,
+      sendSuccess(res, {
         newApps: result.newApps,
         elapsed: result.elapsed,
         sampleApps: result.sampleApps || []
-      });
+      }, result.message || `Product Hunt update completed: ${result.newApps} apps processed`);
     } else {
-      res.status(500).json({
-        error: result.error || 'Product Hunt update failed',
+      sendError(res, 500, result.error || 'Product Hunt update failed', {
         message: 'Failed to update Product Hunt apps',
         elapsed: result.elapsed
       });
@@ -313,9 +311,8 @@ router.post('/refresh-producthunt', async (req, res) => {
       userMessage = 'Cannot connect to Product Hunt API. Please check your internet connection.';
     }
     
-    res.status(statusCode).json({
+    sendError(res, statusCode, userMessage, {
       error: error.message || 'Product Hunt update failed',
-      message: userMessage,
       details: 'Product Hunt integration requires proper API configuration. Visit https://api.producthunt.com/v2/docs for setup instructions.'
     });
   }

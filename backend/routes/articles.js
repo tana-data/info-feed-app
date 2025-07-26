@@ -39,7 +39,7 @@ router.get('/', (req, res) => {
       groupedArticles[category].push(article);
     });
     
-    res.json({
+    sendSuccess(res, {
       articles: rows,
       grouped: groupedArticles,
       total: rows.length
@@ -56,17 +56,16 @@ router.patch('/:id/read', (req, res) => {
     [read_status ? 1 : 0, id],
     function(err) {
       if (err) {
-        return res.status(500).json({ error: err.message });
+        return handleDatabaseError(res, err, 'update article read status');
       }
       
       if (this.changes === 0) {
-        return res.status(404).json({ error: 'Article not found' });
+        return sendError(res, 404, 'Article not found');
       }
       
-      res.json({ 
-        message: 'Article read status updated',
+      sendSuccess(res, {
         read_status: read_status
-      });
+      }, 'Article read status updated');
     }
   );
 });
