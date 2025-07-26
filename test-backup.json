@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-07-26T23:05:15.234Z",
+  "version": "0.6.6",
+  "feeds": [
+    {
+      "url": "https://example.com/test-feed.xml",
+      "title": "Test Feed",
+      "description": "Test feed for restore functionality"
+    }
+  ]
+}

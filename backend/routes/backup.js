@@ -4,6 +4,7 @@ const db = require('../models/database');
 const fs = require('fs');
 const path = require('path');
 const { sendError, sendSuccess, handleDatabaseError } = require('../utils/response-helpers');
+const { dbGet, dbRun } = require('../utils/database-helpers');
 
 // フィードデータのバックアップエンドポイント
 router.get('/feeds', (req, res) => {
@@ -49,55 +50,48 @@ router.post('/feeds/restore', (req, res) => {
   let errorCount = 0;
   const errors = [];
   
-  // Process each feed in the backup
+  // Process each feed in the backup using Promise-based database operations
   const processFeeds = async () => {
-    for (const feed of feeds) {
+    console.log(`🔄 Starting sequential processing of ${feeds.length} feeds...`);
+    
+    for (let i = 0; i < feeds.length; i++) {
+      const feed = feeds[i];
+      console.log(`📋 Processing feed ${i + 1}/${feeds.length}: ${feed.url}`);
+      
       try {
-        await new Promise((resolve, reject) => {
-          // Check if feed already exists
-          db.get('SELECT id FROM feeds WHERE url = ?', [feed.url], (err, existingFeed) => {
-            if (err) {
-              errors.push(`Error checking feed ${feed.url}: ${err.message}`);
-              errorCount++;
-              resolve();
-              return;
-            }
-            
-            if (existingFeed) {
-              // Update existing feed to active
-              db.run(
-                'UPDATE feeds SET is_active = 1, title = ?, description = ? WHERE url = ?',
-                [feed.title, feed.description, feed.url],
-                function(updateErr) {
-                  if (updateErr) {
-                    errors.push(`Error updating feed ${feed.url}: ${updateErr.message}`);
-                    errorCount++;
-                  } else if (this.changes > 0) {
-                    restoredCount++;
-                  }
-                  resolve();
-                }
-              );
-            } else {
-              // Insert new feed
-              db.run(
-                'INSERT INTO feeds (url, title, description, is_active) VALUES (?, ?, ?, 1)',
-                [feed.url, feed.title, feed.description],
-                function(insertErr) {
-                  if (insertErr) {
-                    errors.push(`Error inserting feed ${feed.url}: ${insertErr.message}`);
-                    errorCount++;
-                  } else {
-                    restoredCount++;
-                  }
-                  resolve();
-                }
-              );
-            }
-          });
-        });
+        // Check if feed already exists using Promise-based helper
+        const existingFeed = await dbGet('SELECT id FROM feeds WHERE url = ?', [feed.url]);
+        
+        if (existingFeed) {
+          console.log(`🔄 Updating existing feed: ${feed.url}`);
+          // Update existing feed to active
+          const result = await dbRun(
+            'UPDATE feeds SET is_active = 1, title = ?, description = ? WHERE url = ?',
+            [feed.title, feed.description, feed.url]
+          );
+          
+          if (result.changes > 0) {
+            restoredCount++;
+            console.log(`✅ Updated feed: ${feed.url}`);
+          } else {
+            console.log(`⚠️  No changes made to feed: ${feed.url}`);
+          }
+        } else {
+          console.log(`➕ Inserting new feed: ${feed.url}`);
+          // Insert new feed
+          const result = await dbRun(
+            'INSERT INTO feeds (url, title, description, is_active) VALUES (?, ?, ?, 1)',
+            [feed.url, feed.title, feed.description]
+          );
+          
+          if (result.lastID) {
+            restoredCount++;
+            console.log(`✅ Inserted new feed: ${feed.url} (ID: ${result.lastID})`);
+          }
+        }
       } catch (error) {
-        errors.push(`Unexpected error processing feed ${feed.url}: ${error.message}`);
+        console.error(`❌ Error processing feed ${feed.url}:`, error.message);
+        errors.push(`Error processing feed ${feed.url}: ${error.message}`);
         errorCount++;
       }
     }
