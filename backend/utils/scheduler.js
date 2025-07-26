@@ -2,6 +2,7 @@ const cron = require('node-cron');
 const db = require('../models/database');
 const Parser = require('rss-parser');
 const productHuntClient = require('./producthunt-client');
+const { detectContentType } = require('./content-type');
 const parser = new Parser();
 
 let scheduledTasks = [];
@@ -147,23 +148,6 @@ async function updateSingleFeed(feed) {
   }
 }
 
-function detectContentType(url) {
-  if (!url) return 'article';
-  
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    return 'youtube';
-  }
-  
-  if (url.includes('podcast') || url.includes('anchor.fm') || url.includes('spotify.com')) {
-    return 'podcast';
-  }
-  
-  if (url.includes('producthunt.com') || url.includes('Product Hunt')) {
-    return 'producthunt';
-  }
-  
-  return 'article';
-}
 
 function getSchedulerStatus() {
   const activeTasks = scheduledTasks.filter(({ task }) => task.running);

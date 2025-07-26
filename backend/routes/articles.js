@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../models/database');
+const { sendError, sendSuccess, handleDatabaseError } = require('../utils/response-helpers');
 
 router.get('/', (req, res) => {
   const { unread_only = 'true', limit = 10, offset = 0 } = req.query;
@@ -26,7 +27,7 @@ router.get('/', (req, res) => {
   
   db.all(query, params, (err, rows) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      return handleDatabaseError(res, err, 'fetch articles');
     }
     
     const groupedArticles = {};

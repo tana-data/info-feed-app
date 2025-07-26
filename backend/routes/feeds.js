@@ -4,6 +4,8 @@ const db = require('../models/database');
 const Parser = require('rss-parser');
 const { updateProductHuntApps } = require('../utils/scheduler');
 const productHuntClient = require('../utils/producthunt-client');
+const { detectContentType } = require('../utils/content-type');
+const { sendError, sendSuccess, handleDatabaseError } = require('../utils/response-helpers');
 
 // RSS パーサーにタイムアウト設定を追加（20秒）
 const parser = new Parser({
@@ -16,9 +18,9 @@ const parser = new Parser({
 router.get('/', (req, res) => {
   db.all('SELECT * FROM feeds WHERE is_active = 1 ORDER BY created_at DESC', (err, rows) => {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      return handleDatabaseError(res, err, 'fetch feeds');
     }
-    res.json(rows);
+    sendSuccess(res, rows);
   });
 });
 
@@ -130,14 +132,14 @@ router.delete('/:id', (req, res) => {
   
   db.run('UPDATE feeds SET is_active = 0 WHERE id = ?', [id], function(err) {
     if (err) {
-      return res.status(500).json({ error: err.message });
+      return handleDatabaseError(res, err, 'delete feed');
     }
     
     if (this.changes === 0) {
-      return res.status(404).json({ error: 'Feed not found' });
+      return sendError(res, 404, 'Feed not found');
     }
     
-    res.json({ message: 'Feed deleted successfully' });
+    sendSuccess(res, null, 'Feed deleted successfully');
   });
 });
 
@@ -426,22 +428,5 @@ async function processNewFeedArticles(feedId, feedUrl, feedTitle, res, requestId
   }
 }
 
-function detectContentType(url) {
-  if (!url) return 'article';
-  
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    return 'youtube';
-  }
-  
-  if (url.includes('podcast') || url.includes('anchor.fm') || url.includes('spotify.com')) {
-    return 'podcast';
-  }
-  
-  if (url.includes('producthunt.com') || url.includes('Product Hunt')) {
-    return 'producthunt';
-  }
-  
-  return 'article';
-}
 
 module.exports = router;
